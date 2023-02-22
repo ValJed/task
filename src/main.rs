@@ -1,7 +1,7 @@
 use chrono::{DateTime, NaiveDateTime, Local};
 use serde::{Serialize, Deserialize};
 
-use std::env;
+use std::{env, vec};
 use std::fs::{create_dir, File};
 use std::io::Write;
 use std::path::{Path,PathBuf};
@@ -12,6 +12,7 @@ const HELP_SIGNS: [&str; 2] = ["--help", "help"];
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Task {
+    id: usize,
     name: String,
     done: bool,
     creation_date: String,
@@ -30,6 +31,7 @@ fn main() {
 
     match args[1].as_str() {
         "add" => add_task(data, &args[2], &file_path),
+        "del" => del_task(data, &args[2], &file_path),
         _ => {
             println!("no shit");
         }
@@ -73,24 +75,39 @@ fn get_or_create_data_file (file: &String, folder: String) -> Vec<Task> {
     tasks
 }
 
-fn add_task (data: Vec<Task>, to_add: &String, file_path: &String) {
+fn add_task (mut data: Vec<Task>, to_add: &String, file_path: &String) {
     let date = Local::now();
 
     let task: Task = Task {
+        id: data.len(),
         name: to_add.to_owned(),
         done: false,
         creation_date: date.to_string(),
         modification_date: date.to_string()
     };
 
-    println!("task {:?}", task);
-    println!("data {:?}", data);
-    println!("file_path {:?}", file_path);
+    data.push(task);
+
+    write_to_file(data, file_path);
 }
 
-// fn del_task () {
-//
-// }
+fn write_to_file (data: Vec<Task>, file_path: &String) {
+    let json = serde_json::to_string(&data).expect("Error when stringifying data");
+    let mut file = File::create(file_path).expect("Error when creating file");
+
+    file.write(json.as_bytes()).expect("Error when writting to file");
+}
+
+fn del_task (data: Vec<Task>, id_str: &String, file_path: &String) {
+    let id: usize = id_str.parse().unwrap();
+    let filtered: Vec<Task> = data
+        .into_iter()
+        .filter(|task| task.id != id)
+        .collect();
+
+    println!("{:?}", filtered);
+
+}
 //
 // fn list_tasks () {
 //
