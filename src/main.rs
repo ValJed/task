@@ -1,5 +1,8 @@
 use chrono::{DateTime, NaiveDateTime, Local};
 use serde::{Serialize, Deserialize};
+use comfy_table::{Table,Cell};
+use comfy_table::modifiers::UTF8_ROUND_CORNERS;
+use comfy_table::presets::UTF8_FULL;
 
 use std::{env, vec};
 use std::fs::{create_dir, File};
@@ -32,6 +35,8 @@ fn main() {
     match args[1].as_str() {
         "add" => add_task(data, &args[2], &file_path),
         "del" => del_task(data, &args[2], &file_path),
+        "ls" => list_tasks(data),
+        "done" => mark_done(data, &args[2], &file_path),
         _ => {
             println!("no shit");
         }
@@ -79,7 +84,7 @@ fn add_task (mut data: Vec<Task>, to_add: &String, file_path: &String) {
     let date = Local::now();
 
     let task: Task = Task {
-        id: data.len(),
+        id: data.len() + 1,
         name: to_add.to_owned(),
         done: false,
         creation_date: date.to_string(),
@@ -100,22 +105,43 @@ fn write_to_file (data: Vec<Task>, file_path: &String) {
 
 fn del_task (data: Vec<Task>, id_str: &String, file_path: &String) {
     let id: usize = id_str.parse().unwrap();
-    let filtered: Vec<Task> = data
+    let updated_data: Vec<Task> = data
         .into_iter()
         .filter(|task| task.id != id)
         .collect();
 
-    println!("{:?}", filtered);
-
+    write_to_file(updated_data, file_path);
 }
-//
-// fn list_tasks () {
-//
-// }
-//
-// fn done () {
-//
-// }
+
+fn list_tasks (data: Vec<Task>) {
+    let mut table = Table::new();
+    table.load_preset(UTF8_FULL).apply_modifier(UTF8_ROUND_CORNERS);
+            
+    for task in &data {
+        let check = if task.done {
+            "[X]".to_string()
+        } else {
+            "[]".to_string()
+        };
+
+        table.add_row(vec![Cell::new(check), Cell::new(task.name.to_owned())]);
+    }
+}
+
+fn mark_done (mut data: Vec<Task>, id_str: &String, file_path: &String) {
+    let id: usize = id_str.parse().unwrap();
+    let udpated_tasks: Vec<Task> = data
+        .into_iter()
+        .map(|task| {
+            if task.id == id {
+               task.done = true; 
+            }
+
+            task
+
+        })
+    
+}
 //
 // fn clean_task () {}
 //
