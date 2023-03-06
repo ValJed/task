@@ -160,10 +160,13 @@ fn mark_done(data: Vec<Task>, id_str: &String, file_path: &String) {
 }
 
 fn print_help() {
-    println!("Usage: [options]\n");
-    println!("OPTIONS");
-    println!("  add\t\tcreated task based on passed string");
-    println!("  done\t\tmarks task as done");
-    println!("  del\t\tdeletes task based on passed id");
-    println!("  clear\t\tclear all tasks");
+    println!("Tiny tasks CLI in Rust.\n");
+    println!("Usage:");
+    println!("tasks ls                 shows the list of tasks");
+    println!("tasks add <content>      creates task based on the passed content string");
+    println!("tasks done <id>          marks task as done");
+    println!("tasks del <id>           deletes task based on the passed id");
+    println!("tasks clear              clear all tasks\n");
+    println!("OPTIONS:");
+    println!("-h, --help              shows help");
 }
