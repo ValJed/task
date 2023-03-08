@@ -76,11 +76,7 @@ fn use_context(mut data: Vec<Context>, name: &String, file_path: &String) {
     let updated_data = data
         .into_iter()
         .map(|mut ctx| {
-            if ctx.name == name.to_owned() {
-                ctx.active = true;
-            } else {
-                ctx.active = false;
-            }
+            ctx.active = ctx.name == name.to_owned();
 
             ctx
         })
