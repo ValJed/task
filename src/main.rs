@@ -10,7 +10,7 @@ use std::io::Write;
 use std::path::Path;
 use std::{env, vec};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 struct Task {
     id: usize,
     name: String,
@@ -57,8 +57,8 @@ fn main() {
     match args[1].as_str() {
         "use" => use_context(data, &args[2], &file_path),
         "add" => add_task(data, &args[2], &file_path, active_index.unwrap()),
-        // "del" => del_task(data, &args[2], &file_path),
-        // "ls" => list_tasks(data),
+        "del" => del_task(data, &args[2], &file_path, active_index.unwrap()),
+        "ls" => list_tasks(data, active_index.unwrap()),
         // "done" => mark_done(data, &args[2], &file_path),
         // "clear" => write_to_file(vec![], &file_path),
         _ => print_help(),
@@ -141,53 +141,56 @@ fn write_to_file(data: Vec<Context>, file_path: &String) {
         .expect("Error when writing to file");
 }
 
-// fn del_task(data: Vec<Context>, id_str: &String, file_path: &String) {
-//     let id: usize = id_str.parse().unwrap();
-//     let mut counter = 0;
-//     let updated_tasks: Vec<Task> = data
-//         .into_iter()
-//         .filter_map(|mut task| {
-//             if task.id == id {
-//                 return None;
-//             }
-//
-//             counter += 1;
-//             task.id = counter;
-//
-//             Some(task)
-//         })
-//         .collect();
-//
-//     write_to_file(updated_tasks, file_path);
-// }
-//
-// fn list_tasks(data: Vec<Context>) {
-//     let mut table = Table::new();
-//     table
-//         .load_preset(UTF8_FULL)
-//         .apply_modifier(UTF8_ROUND_CORNERS);
-//
-//     for task in &data {
-//         let check = if task.done {
-//             "[X]".to_string()
-//         } else {
-//             "[]".to_string()
-//         };
-//
-//         table.add_row(vec![
-//             Cell::new(task.id.to_owned()),
-//             Cell::new(check),
-//             Cell::new(task.name.to_owned()),
-//         ]);
-//     }
-//
-//     if data.len() == 0 {
-//         table.add_row(vec![Cell::new("Let's chill, or get to work maybe?")]);
-//     }
-//
-//     println!("{table}")
-// }
-//
+fn del_task(mut data: Vec<Context>, id_str: &String, file_path: &String, index: usize) {
+    let id: usize = id_str.parse().unwrap();
+    let mut counter = 0;
+
+    let active_tasks = data[index].tasks.clone();
+
+    data[index].tasks = active_tasks
+        .into_iter()
+        .filter_map(|mut task| {
+            if task.id == id {
+                return None;
+            }
+
+            counter += 1;
+            task.id = counter;
+
+            Some(task)
+        })
+        .collect();
+
+    write_to_file(data, file_path);
+}
+
+fn list_tasks(data: Vec<Context>, index: usize) {
+    let mut table = Table::new();
+    table
+        .load_preset(UTF8_FULL)
+        .apply_modifier(UTF8_ROUND_CORNERS);
+
+    for task in &data[index].tasks {
+        let check = if task.done {
+            "[X]".to_string()
+        } else {
+            "[]".to_string()
+        };
+
+        table.add_row(vec![
+            Cell::new(task.id.to_owned()),
+            Cell::new(check),
+            Cell::new(task.name.to_owned()),
+        ]);
+    }
+
+    if data.len() == 0 {
+        table.add_row(vec![Cell::new("Let's chill, or get to work maybe?")]);
+    }
+
+    println!("{table}")
+}
+
 // fn mark_done(data: Vec<Context>, id_str: &String, file_path: &String) {
 //     let id: usize = id_str.parse().unwrap();
 //     let udpated_tasks: Vec<Task> = data
