@@ -55,7 +55,7 @@ fn main() {
     };
 
     match args[1].as_str() {
-        "use" => use_context(data, &args[2], &file_path, active_index),
+        "use" => use_context(data, &args[2], &file_path),
         // "add" => add_task(data, &args[2], &file_path),
         // "del" => del_task(data, &args[2], &file_path),
         // "ls" => list_tasks(data),
@@ -65,35 +65,28 @@ fn main() {
     }
 }
 
-fn use_context(
-    mut data: Vec<Context>,
-    name: &String,
-    file_path: &String,
-    active_index: Option<usize>,
-) {
-    if active_index.is_none() {
-        let context = Context::new(name, 0);
+fn use_context(mut data: Vec<Context>, name: &String, file_path: &String) {
+    let exists = data.iter().find(|ctx| ctx.name == name.to_owned());
 
-        data.push(context);
-        return;
+    if exists.is_none() {
+        let new_context = Context::new(name, data.len());
+        data.push(new_context);
     }
 
-    // let exists = data.iter().fuse
+    let updated_data = data
+        .into_iter()
+        .map(|mut ctx| {
+            if ctx.name == name.to_owned() {
+                ctx.active = true;
+            } else {
+                ctx.active = false;
+            }
 
-    let index = active_index.unwrap();
-    println!("index: {:?}", index);
-    // let current_active = data[index];
+            ctx
+        })
+        .collect();
 
-    // write_to_file(data, file_path);
-    // let updated_contexts = data.iter().map(|ctx| {
-    //     if ctx.name == name.to_owned() {
-    //         ctx.active = true
-    //     } else {
-    //         ctx.active = false
-    //     }
-    //
-    //     ctx
-    // });
+    write_to_file(updated_data, file_path)
 }
 
 fn get_file_paths() -> [String; 2] {
