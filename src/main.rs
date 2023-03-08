@@ -60,7 +60,7 @@ fn main() {
         "del" => del_task(data, &args[2], &file_path, active_index.unwrap()),
         "ls" => list_tasks(data, active_index.unwrap()),
         "done" => mark_done(data, &args[2], &file_path, active_index.unwrap()),
-        // "clear" => write_to_file(vec![], &file_path),
+        "clear" => clear_tasks(data, &file_path, active_index.unwrap()),
         _ => print_help(),
     }
 }
@@ -204,6 +204,12 @@ fn mark_done(mut data: Vec<Context>, id_str: &String, file_path: &String, index:
     data[index].tasks[task_index.unwrap()].done = true;
 
     write_to_file(data, file_path);
+}
+
+fn clear_tasks(mut data: Vec<Context>, file_path: &String, index: usize) {
+    data[index].tasks = vec![];
+
+    write_to_file(data, file_path)
 }
 
 fn print_help() {
