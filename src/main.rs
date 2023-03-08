@@ -59,7 +59,7 @@ fn main() {
         "add" => add_task(data, &args[2], &file_path, active_index.unwrap()),
         "del" => del_task(data, &args[2], &file_path, active_index.unwrap()),
         "ls" => list_tasks(data, active_index.unwrap()),
-        // "done" => mark_done(data, &args[2], &file_path),
+        "done" => mark_done(data, &args[2], &file_path, active_index.unwrap()),
         // "clear" => write_to_file(vec![], &file_path),
         _ => print_help(),
     }
@@ -191,21 +191,20 @@ fn list_tasks(data: Vec<Context>, index: usize) {
     println!("{table}")
 }
 
-// fn mark_done(data: Vec<Context>, id_str: &String, file_path: &String) {
-//     let id: usize = id_str.parse().unwrap();
-//     let udpated_tasks: Vec<Task> = data
-//         .into_iter()
-//         .map(|mut task| {
-//             if task.id == id {
-//                 task.done = true;
-//             }
-//
-//             task
-//         })
-//         .collect();
-//
-//     write_to_file(udpated_tasks, file_path);
-// }
+fn mark_done(mut data: Vec<Context>, id_str: &String, file_path: &String, index: usize) {
+    let id: usize = id_str.parse().unwrap();
+
+    let task_index = data[index].tasks.iter().position(|t| t.id == id);
+
+    if task_index.is_none() {
+        println!("No task with the id {}", id);
+        return;
+    }
+
+    data[index].tasks[task_index.unwrap()].done = true;
+
+    write_to_file(data, file_path);
+}
 
 fn print_help() {
     println!("Tiny tasks CLI in Rust.\n");
