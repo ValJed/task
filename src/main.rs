@@ -56,7 +56,7 @@ fn main() {
 
     match args[1].as_str() {
         "use" => use_context(data, &args[2], &file_path),
-        // "add" => add_task(data, &args[2], &file_path),
+        "add" => add_task(data, &args[2], &file_path, active_index.unwrap()),
         // "del" => del_task(data, &args[2], &file_path),
         // "ls" => list_tasks(data),
         // "done" => mark_done(data, &args[2], &file_path),
@@ -117,34 +117,21 @@ fn get_or_create_data_file(file: &String, folder: String) -> Vec<Context> {
     contexts
 }
 
-// fn add_context(mut data: Vec<Context>, name: &String, file_path: &String) {
-//     let context: Context = Context {
-//         id: data.len() + 1,
-//         name: name.to_owned(),
-//         tasks: vec![],
-//         active: true,
-//     };
-//
-//     data.push(context);
-//
-//     write_to_file(data, file_path);
-// }
-//
-// fn add_task(mut data: Vec<Context>, to_add: &String, file_path: &String) {
-//     let date = Local::now();
-//
-//     let task: Task = Task {
-//         id: data.len() + 1,
-//         name: to_add.to_owned(),
-//         done: false,
-//         creation_date: date.to_string(),
-//         modification_date: date.to_string(),
-//     };
-//
-//     data.push(task);
-//
-//     write_to_file(data, file_path);
-// }
+fn add_task(mut data: Vec<Context>, to_add: &String, file_path: &String, index: usize) {
+    let date = Local::now();
+
+    let task: Task = Task {
+        id: data[index].tasks.len() + 1,
+        name: to_add.to_owned(),
+        done: false,
+        creation_date: date.to_string(),
+        modification_date: date.to_string(),
+    };
+
+    data[index].tasks.push(task);
+
+    write_to_file(data, file_path);
+}
 
 fn write_to_file(data: Vec<Context>, file_path: &String) {
     let json = serde_json::to_string(&data).expect("Error when stringifying data");
