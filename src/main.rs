@@ -58,11 +58,11 @@ fn main() {
         "use" => use_context(data, &args[2], &file_path),
         "add" => add_task(data, &args[2], &file_path, active_index.unwrap()),
         "rm" => del_task(data, &args[2], &file_path, active_index.unwrap()),
+        "rmc" => del_context(data, &args[2], &file_path, active_index.unwrap()),
         "ls" => list_tasks(data, active_index.unwrap()),
+        "lsc" => list_contexts(data),
         "done" => mark_done(data, &args[2], &file_path, active_index.unwrap()),
         "clear" => clear_tasks(data, &file_path, active_index.unwrap()),
-        "rmc" => del_context(data, &args[2], &file_path, active_index.unwrap()),
-        "lsc" => list_contexts(data),
         _ => print_help(),
     }
 }
@@ -219,20 +219,16 @@ fn clear_tasks(mut data: Vec<Context>, file_path: &String, index: usize) {
 fn del_context(data: Vec<Context>, name: &String, file_path: &String, index: usize) {
     let active_deleted = data[index].name == name.to_owned();
 
-    let updated_data = data
+    let mut updated_data: Vec<Context> = data
         .into_iter()
         .filter(|ctx| ctx.name != name.to_owned())
         .collect();
 
-    if active_deleted
-        && data.iter().any(|&i| {
-            println!("i: {:?}", i);
-        })
-    {
-        data[0].active = true;
+    if active_deleted && !updated_data.get(0).is_none() {
+        updated_data[0].active = true;
     }
 
-    // write_to_file(updated_data, file_path);
+    write_to_file(updated_data, file_path);
 }
 
 fn list_contexts(data: Vec<Context>) {
@@ -241,8 +237,17 @@ fn list_contexts(data: Vec<Context>) {
         .load_preset(UTF8_FULL)
         .apply_modifier(UTF8_ROUND_CORNERS);
 
-    for ctx in data {
-        table.add_row(vec![ctx.name, format!("{} tasks", ctx.tasks.len())]);
+    for ctx in data.iter() {
+        let active = if ctx.active { "active" } else { "" };
+        table.add_row(vec![
+            ctx.name.to_owned(),
+            format!("{} tasks", ctx.tasks.len()),
+            active.to_string(),
+        ]);
+    }
+
+    if data.len() == 0 {
+        table.add_row(vec!["Add your first context using: tasks use <context>"]);
     }
 
     print!("{table}");
@@ -251,12 +256,14 @@ fn list_contexts(data: Vec<Context>) {
 fn print_help() {
     println!("Tiny tasks CLI in Rust.\n");
     println!("Usage:");
-    println!("tasks ls                 shows the list of tasks");
-    println!("tasks add <content>      creates task based on the passed content string");
-    println!("tasks done <id>          marks task as done");
-    println!("tasks rm <id>            deletes task based on the passed id");
-    println!("tasks rmc <name>         deletes context based on the name");
-    println!("tasks clear              clear all tasks\n");
+    println!("tasks use                     uses or creates new context");
+    println!("tasks ls                      shows the list of tasks");
+    println!("tasks lsc                     shows the list of contexts");
+    println!("tasks add \"<content>\"       creates task based on content string");
+    println!("tasks done <id>               marks task as done");
+    println!("tasks rm <id>                 deletes task based on the id");
+    println!("tasks rmc <name>              deletes context based on the name");
+    println!("tasks clear                   clear all tasks for active context\n");
     println!("OPTIONS:");
-    println!("-h, --help               shows help");
+    println!("-h, --help                    shows help");
 }
