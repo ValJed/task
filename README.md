@@ -2,15 +2,15 @@
 
 Tiny tasks CLI in Rust.
 
-Usage:\n
-tasks use                     uses or creates new context\n
-tasks ls                      shows the list of tasks\n
-tasks lsc                     shows the list of contexts\n
-tasks add \"<content>\"       creates task based on content string\n
-tasks done <id>               marks task as done\n
-tasks rm <id>                 deletes task based on the id\n
-tasks rmc <name>              deletes context based on the name\n
+Usage:<br>
+tasks use                     uses or creates new context<br>
+tasks ls                      shows the list of tasks<br>
+tasks lsc                     shows the list of contexts<br>
+tasks add \"<content>\"       creates task based on content string<br>
+tasks done <id>               marks task as done<br>
+tasks rm <id>                 deletes task based on the id<br>
+tasks rmc <name>              deletes context based on the name<br>
 tasks clear                   clear all tasks for active context
 
-OPTIONS:\n
+OPTIONS:<br>
 -h, --help                    shows help
