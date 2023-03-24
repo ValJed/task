@@ -285,14 +285,14 @@ fn parse_ids(ids: Vec<&str>) -> Vec<usize> {
 fn print_help() {
     println!("Tiny tasks CLI in Rust.\n");
     println!("Usage:");
-    println!("tasks use                     uses or creates new context");
-    println!("tasks ls                      shows the list of tasks");
-    println!("tasks lsc                     shows the list of contexts");
-    println!("tasks add \"{{content}}\"     creates task based on content string");
-    println!("tasks done {{id}}             marks task as done");
-    println!("tasks rm {{id}}               deletes task based on the id");
-    println!("tasks rmc {{name}}            deletes context based on the name");
-    println!("tasks clear                   clear all tasks for active context\n");
+    println!("  tasks use                         uses or creates new context");
+    println!("  tasks ls                          shows the list of tasks");
+    println!("  tasks lsc                         shows the list of contexts");
+    println!("  tasks add \"{{content}}\"             creates task based on content string");
+    println!("  tasks done {{id}}                   marks one or several tasks (separated by a comma) as done");
+    println!("  tasks rm {{id}}                     deletes one or several tasks (separated by a comma) based on the id");
+    println!("  tasks rmc {{name}}                  deletes one or several contexts (separated by a comma) based on the name");
+    println!("  tasks clear                       clear all tasks for active context\n");
     println!("OPTIONS:");
-    println!("-h, --help                    shows help");
+    println!("  -h, --help                        shows help");
 }
