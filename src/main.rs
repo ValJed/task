@@ -52,6 +52,7 @@ fn main() {
 
     if active_index.is_none() && args[1] != "use" {
         println!("No current active context, let's create one using tasks use {{name}}");
+        return;
     };
 
     match args[1].as_str() {
@@ -65,12 +66,6 @@ fn main() {
         "clear" => clear_tasks(data, &file_path, active_index.unwrap()),
         _ => print_help(),
     }
-}
-
-fn parse_args(args: &String) -> Vec<&str> {
-    let splitted = args.split(",").collect();
-
-    splitted
 }
 
 fn use_context(mut data: Vec<Context>, name: &String, file_path: &String) {
@@ -150,7 +145,7 @@ fn write_to_file(data: Vec<Context>, file_path: &String) {
 }
 
 fn del_task(mut data: Vec<Context>, args: &String, file_path: &String, index: usize) {
-    let ids = parse_args_ids(args);
+    let ids = parse_ids(parse_args(args));
     let mut counter = 0;
 
     let active_tasks = data[index].tasks.clone();
@@ -201,17 +196,21 @@ fn list_tasks(data: Vec<Context>, index: usize) {
     println!("{table}")
 }
 
-fn mark_done(mut data: Vec<Context>, id_str: &String, file_path: &String, index: usize) {
-    let id: usize = id_str.parse().unwrap();
+fn mark_done(mut data: Vec<Context>, args: &String, file_path: &String, index: usize) {
+    let ids = parse_ids(parse_args(args));
 
-    let task_index = data[index].tasks.iter().position(|t| t.id == id);
+    data[index].tasks = data[index]
+        .tasks
+        .iter()
+        .map(|task| {
+            let mut cloned = task.clone();
+            if ids.contains(&cloned.id) {
+                cloned.done = true
+            }
 
-    if task_index.is_none() {
-        println!("No task with the id {}", id);
-        return;
-    }
-
-    data[index].tasks[task_index.unwrap()].done = true;
+            cloned.to_owned()
+        })
+        .collect();
 
     write_to_file(data, file_path);
 }
@@ -222,12 +221,13 @@ fn clear_tasks(mut data: Vec<Context>, file_path: &String, index: usize) {
     write_to_file(data, file_path)
 }
 
-fn del_context(data: Vec<Context>, name: &String, file_path: &String, index: usize) {
-    let active_deleted = data[index].name == name.to_owned();
+fn del_context(data: Vec<Context>, args: &String, file_path: &String, index: usize) {
+    let ctx_names = parse_args(args);
+    let active_deleted = ctx_names.contains(&data[index].name.as_str());
 
     let mut updated_data: Vec<Context> = data
         .into_iter()
-        .filter(|ctx| ctx.name != name.to_owned())
+        .filter(|ctx| !ctx_names.contains(&ctx.name.as_str()))
         .collect();
 
     if active_deleted && !updated_data.get(0).is_none() {
@@ -256,20 +256,30 @@ fn list_contexts(data: Vec<Context>) {
         table.add_row(vec!["Add your first context using: tasks use {{context}}"]);
     }
 
-    print!("{table}");
+    println!("{table}");
 }
 
-fn parse_args_ids(args: &String) -> Vec<usize> {
-    let ids = args
-        .split(",")
-        .map(|id_str| {
-            id_str
-                .parse()
-                .expect("You must pass tasks ids only, seperated by a comma if several")
-        })
-        .collect();
+fn parse_args(args: &String) -> Vec<&str> {
+    args.split(",").collect()
+}
 
-    ids
+fn parse_ids(ids: Vec<&str>) -> Vec<usize> {
+    ids.iter()
+        .filter_map(|id_str| {
+            if id_str.len() == 0 {
+                return None;
+            }
+
+            let parsed = id_str.parse();
+            match parsed {
+                Err(_) => {
+                    println!("You can only use Ids, this is not: {id_str}");
+                    None
+                }
+                Ok(id) => Some(id),
+            }
+        })
+        .collect()
 }
 
 fn print_help() {
