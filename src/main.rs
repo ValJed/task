@@ -67,6 +67,12 @@ fn main() {
     }
 }
 
+fn parse_args(args: &String) -> Vec<&str> {
+    let splitted = args.split(",").collect();
+
+    splitted
+}
+
 fn use_context(mut data: Vec<Context>, name: &String, file_path: &String) {
     let exists = data.iter().find(|ctx| ctx.name == name.to_owned());
 
@@ -143,8 +149,8 @@ fn write_to_file(data: Vec<Context>, file_path: &String) {
         .expect("Error when writing to file");
 }
 
-fn del_task(mut data: Vec<Context>, id_str: &String, file_path: &String, index: usize) {
-    let id: usize = id_str.parse().unwrap();
+fn del_task(mut data: Vec<Context>, args: &String, file_path: &String, index: usize) {
+    let ids = parse_args_ids(args);
     let mut counter = 0;
 
     let active_tasks = data[index].tasks.clone();
@@ -152,7 +158,7 @@ fn del_task(mut data: Vec<Context>, id_str: &String, file_path: &String, index: 
     data[index].tasks = active_tasks
         .into_iter()
         .filter_map(|mut task| {
-            if task.id == id {
+            if ids.contains(&task.id) {
                 return None;
             }
 
@@ -251,6 +257,19 @@ fn list_contexts(data: Vec<Context>) {
     }
 
     print!("{table}");
+}
+
+fn parse_args_ids(args: &String) -> Vec<usize> {
+    let ids = args
+        .split(",")
+        .map(|id_str| {
+            id_str
+                .parse()
+                .expect("You must pass tasks ids only, seperated by a comma if several")
+        })
+        .collect();
+
+    ids
 }
 
 fn print_help() {
