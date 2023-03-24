@@ -13,4 +13,6 @@ comfy-table = "6.1.4"
 
 [profile.release]
 lto = true
-panic = 'abort'
+strip = true
+opt-level = "s"
+codegen-units = 1
