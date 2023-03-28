@@ -3,6 +3,8 @@ use comfy_table::modifiers::UTF8_ROUND_CORNERS;
 use comfy_table::presets::UTF8_FULL;
 use comfy_table::{Cell, Table};
 use serde::{Deserialize, Serialize};
+use ssh2::Session;
+use std::net::TcpStream;
 
 use std::fs::{create_dir, File};
 use std::io::BufReader;
@@ -38,8 +40,26 @@ impl Context {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct Config {
+    ssh_ip: String,
+    ssh_username: String,
+    ssh_file_path: String,
+}
+
+impl ::std::default::Default for Config {
+    fn default() -> Self {
+        Self {
+            ssh_ip: "".into(),
+            ssh_username: "".into(),
+            ssh_file_path: "".into(),
+        }
+    }
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
+    let config: Config = confy::load("tasks", "config").unwrap();
 
     if args.len() < 2 {
         print_help();
@@ -47,25 +67,38 @@ fn main() {
     }
 
     let [file_path, folder_path] = get_file_paths();
-    let data = get_or_create_data_file(&file_path, folder_path);
-    let active_index = data.iter().position(|context| context.active == true);
-
-    if active_index.is_none() && args[1] != "use" {
-        println!("No current active context, let's create one using tasks use {{name}}");
-        return;
+    let data_res = if config.ssh_ip.is_empty() {
+        Ok(get_or_create_data_file(&file_path, folder_path))
+    } else {
+        get_or_create_data_file_ssh(&file_path)
     };
 
-    match args[1].as_str() {
-        "use" => use_context(data, &args[2], &file_path),
-        "add" => add_task(data, &args[2], &file_path, active_index.unwrap()),
-        "rm" => del_task(data, &args[2], &file_path, active_index.unwrap()),
-        "rmc" => del_context(data, &args[2], &file_path, active_index.unwrap()),
-        "ls" => list_tasks(data, active_index.unwrap()),
-        "lsc" => list_contexts(data),
-        "done" => mark_done(data, &args[2], &file_path, active_index.unwrap()),
-        "clear" => clear_tasks(data, &file_path, active_index.unwrap()),
-        _ => print_help(),
+    if data_res.is_err() {
+        print!("{:?}", data_res.unwrap());
+        return;
     }
+
+    let data = data_res.unwrap();
+
+    println!("data: {:?}", data);
+    // let active_index = data.iter().position(|context| context.active == true);
+    //
+    // if active_index.is_none() && args[1] != "use" {
+    //     println!("No current active context, let's create one using tasks use {{name}}");
+    //     return;
+    // };
+    //
+    // match args[1].as_str() {
+    //     "use" => use_context(data, &args[2], &file_path),
+    //     "add" => add_task(data, &args[2], &file_path, active_index.unwrap()),
+    //     "rm" => del_task(data, &args[2], &file_path, active_index.unwrap()),
+    //     "rmc" => del_context(data, &args[2], &file_path, active_index.unwrap()),
+    //     "ls" => list_tasks(data, active_index.unwrap()),
+    //     "lsc" => list_contexts(data),
+    //     "done" => mark_done(data, &args[2], &file_path, active_index.unwrap()),
+    //     "clear" => clear_tasks(data, &file_path, active_index.unwrap()),
+    //     _ => print_help(),
+    // }
 }
 
 fn use_context(mut data: Vec<Context>, name: &String, file_path: &String) {
@@ -94,6 +127,48 @@ fn get_file_paths() -> [String; 2] {
     let file_path = format!("{folder_path}/tasks.json");
 
     [file_path, folder_path]
+}
+
+fn get_or_create_data_file_ssh(file: &String) -> Result<Vec<Context>, String> {
+    // Connect to the local SSH server
+    let tcp = TcpStream::connect("Put port here").expect("TCP connection failed");
+    let mut sess = Session::new().expect("Erro while creating TCP Session");
+    sess.set_tcp_stream(tcp);
+    sess.handshake().unwrap();
+
+    // Try to authenticate with the first identity in the agent.
+    sess.userauth_agent("username here").unwrap();
+
+    if !sess.authenticated() {
+        return Err("Authentication failed".to_string());
+    }
+
+    let sftp = sess.sftp().expect("Sftp subsystem initialization failed");
+
+    let path = Path::new("tasks.json");
+    let file_res = sftp.open(path);
+
+    match file_res {
+        Ok(file) => {
+            let reader = BufReader::new(file);
+            let contexts: Vec<Context> =
+                serde_json::from_reader(reader).expect("Error when extracting data from file");
+
+            Ok(contexts)
+        }
+        Err(_) => {
+            let mut file = sftp
+                .create(path)
+                .expect("Impossible to write on remote file");
+
+            file.write("[]".as_bytes())
+                .expect("Error when writing to file");
+
+            file.close().unwrap();
+
+            Ok(vec![])
+        }
+    }
 }
 
 fn get_or_create_data_file(file: &String, folder: String) -> Vec<Context> {
