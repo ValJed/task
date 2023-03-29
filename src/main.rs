@@ -3,7 +3,7 @@ use comfy_table::modifiers::UTF8_ROUND_CORNERS;
 use comfy_table::presets::UTF8_FULL;
 use comfy_table::{Cell, Table};
 use serde::{Deserialize, Serialize};
-use ssh2::Session;
+use ssh2::{Session, Sftp};
 use std::net::TcpStream;
 
 use std::fs::{create_dir, File};
@@ -45,6 +45,7 @@ struct Config {
     ssh_ip: String,
     ssh_username: String,
     ssh_file_path: String,
+    local_file_path: String,
 }
 
 impl ::std::default::Default for Config {
@@ -53,55 +54,60 @@ impl ::std::default::Default for Config {
             ssh_ip: "".into(),
             ssh_username: "".into(),
             ssh_file_path: "".into(),
+            local_file_path: "".into(),
         }
     }
 }
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let config: Config = confy::load("tasks", "config").unwrap();
+    let mut config: Config = confy::load("tasks", "config").unwrap();
 
     if args.len() < 2 {
         print_help();
         return;
     }
 
-    let [file_path, folder_path] = get_file_paths();
+    let [file_path, folder_path] = get_file_paths(&config.local_file_path);
+    config.local_file_path = file_path;
+
     let data_res = if config.ssh_ip.is_empty() {
-        Ok(get_or_create_data_file(&file_path, folder_path))
+        Ok(get_or_create_data_file(
+            &config.local_file_path,
+            folder_path,
+        ))
     } else {
-        get_or_create_data_file_ssh(&file_path)
+        get_or_create_data_file_ssh(&config)
     };
 
     if data_res.is_err() {
-        print!("{:?}", data_res.unwrap());
         return;
     }
 
     let data = data_res.unwrap();
+    let active_index = data.iter().position(|context| context.active == true);
 
-    println!("data: {:?}", data);
-    // let active_index = data.iter().position(|context| context.active == true);
-    //
-    // if active_index.is_none() && args[1] != "use" {
-    //     println!("No current active context, let's create one using tasks use {{name}}");
-    //     return;
-    // };
-    //
-    // match args[1].as_str() {
-    //     "use" => use_context(data, &args[2], &file_path),
-    //     "add" => add_task(data, &args[2], &file_path, active_index.unwrap()),
-    //     "rm" => del_task(data, &args[2], &file_path, active_index.unwrap()),
-    //     "rmc" => del_context(data, &args[2], &file_path, active_index.unwrap()),
-    //     "ls" => list_tasks(data, active_index.unwrap()),
-    //     "lsc" => list_contexts(data),
-    //     "done" => mark_done(data, &args[2], &file_path, active_index.unwrap()),
-    //     "clear" => clear_tasks(data, &file_path, active_index.unwrap()),
-    //     _ => print_help(),
-    // }
+    if active_index.is_none() && args[1] != "use" {
+        println!("No current active context, let's create one using tasks use {{name}}");
+        return;
+    };
+
+    let ctx_index = active_index.unwrap();
+
+    match args[1].as_str() {
+        "use" => use_context(data, &args[2], &config),
+        "add" => add_task(data, &args[2], &config, ctx_index),
+        "rm" => del_task(data, &args[2], &config, ctx_index),
+        "rmc" => del_context(data, &args[2], &config, ctx_index),
+        "ls" => list_tasks(data, ctx_index),
+        "lsc" => list_contexts(data),
+        "done" => mark_done(data, &args[2], &config, ctx_index),
+        "clear" => clear_tasks(data, &config, ctx_index),
+        _ => print_help(),
+    }
 }
 
-fn use_context(mut data: Vec<Context>, name: &String, file_path: &String) {
+fn use_context(mut data: Vec<Context>, name: &String, config: &Config) {
     let exists = data.iter().find(|ctx| ctx.name == name.to_owned());
 
     if exists.is_none() {
@@ -118,34 +124,63 @@ fn use_context(mut data: Vec<Context>, name: &String, file_path: &String) {
         })
         .collect();
 
-    write_to_file(updated_data, file_path)
+    write_to_file(updated_data, config)
 }
 
-fn get_file_paths() -> [String; 2] {
+fn get_file_paths(local_file_path: &String) -> [String; 2] {
     let user = env::var("USER").expect("No user set on this machine");
-    let folder_path = format!("/home/{user}/.local/share/tasks");
+    let folder_path = if local_file_path.is_empty() {
+        format!("/home/{user}/.local/share/tasks")
+    } else {
+        local_file_path.to_owned()
+    };
     let file_path = format!("{folder_path}/tasks.json");
 
     [file_path, folder_path]
 }
 
-fn get_or_create_data_file_ssh(file: &String) -> Result<Vec<Context>, String> {
+fn get_sftp(config: &Config) -> Result<Sftp, ()> {
     // Connect to the local SSH server
-    let tcp = TcpStream::connect("Put port here").expect("TCP connection failed");
+    let tcp = TcpStream::connect(&config.ssh_ip).expect("TCP connection failed");
     let mut sess = Session::new().expect("Erro while creating TCP Session");
+
     sess.set_tcp_stream(tcp);
     sess.handshake().unwrap();
 
     // Try to authenticate with the first identity in the agent.
-    sess.userauth_agent("username here").unwrap();
+    sess.userauth_agent(&config.ssh_username).unwrap();
 
     if !sess.authenticated() {
-        return Err("Authentication failed".to_string());
+        println!("Authentication failed");
+        return Err(());
     }
 
     let sftp = sess.sftp().expect("Sftp subsystem initialization failed");
 
-    let path = Path::new("tasks.json");
+    Ok(sftp)
+}
+
+fn get_remote_path(config: &Config) -> String {
+    let sep = if config.ssh_file_path.is_empty() {
+        ""
+    } else {
+        "/"
+    };
+    let file_path = format!("{}{sep}tasks.json", config.ssh_file_path);
+
+    file_path
+}
+
+fn get_or_create_data_file_ssh(config: &Config) -> Result<Vec<Context>, ()> {
+    let sftp_res = get_sftp(&config);
+    if sftp_res.is_err() {
+        return Err(());
+    };
+
+    let sftp = sftp_res.unwrap();
+    let path_str = get_remote_path(&config);
+    let path = Path::new(&path_str);
+
     let file_res = sftp.open(path);
 
     match file_res {
@@ -195,7 +230,7 @@ fn get_or_create_data_file(file: &String, folder: String) -> Vec<Context> {
     contexts
 }
 
-fn add_task(mut data: Vec<Context>, to_add: &String, file_path: &String, index: usize) {
+fn add_task(mut data: Vec<Context>, to_add: &String, config: &Config, index: usize) {
     let date = Local::now();
 
     let task: Task = Task {
@@ -208,18 +243,41 @@ fn add_task(mut data: Vec<Context>, to_add: &String, file_path: &String, index: 
 
     data[index].tasks.push(task);
 
-    write_to_file(data, file_path);
+    write_to_file(data, &config);
 }
 
-fn write_to_file(data: Vec<Context>, file_path: &String) {
+fn write_to_file(data: Vec<Context>, config: &Config) {
     let json = serde_json::to_string(&data).expect("Error when stringifying data");
-    let mut file = File::create(file_path).expect("Error when creating file");
+
+    if config.ssh_ip.is_empty() {
+        let mut file = File::create(&config.local_file_path).expect("Error when creating file");
+
+        file.write(json.as_bytes())
+            .expect("Error when writing to file");
+
+        return;
+    }
+
+    let sftp_res = get_sftp(&config);
+    if sftp_res.is_err() {
+        return;
+    }
+
+    let sftp = sftp_res.unwrap();
+    let path_str = get_remote_path(&config);
+    let path = Path::new(&path_str);
+
+    let mut file = sftp
+        .create(path)
+        .expect("Impossible to write on remote file");
 
     file.write(json.as_bytes())
         .expect("Error when writing to file");
+
+    file.close().unwrap();
 }
 
-fn del_task(mut data: Vec<Context>, args: &String, file_path: &String, index: usize) {
+fn del_task(mut data: Vec<Context>, args: &String, config: &Config, index: usize) {
     let ids = parse_ids(parse_args(args));
     let mut counter = 0;
 
@@ -239,7 +297,7 @@ fn del_task(mut data: Vec<Context>, args: &String, file_path: &String, index: us
         })
         .collect();
 
-    write_to_file(data, file_path);
+    write_to_file(data, &config);
 }
 
 fn list_tasks(data: Vec<Context>, index: usize) {
@@ -271,7 +329,7 @@ fn list_tasks(data: Vec<Context>, index: usize) {
     println!("{table}")
 }
 
-fn mark_done(mut data: Vec<Context>, args: &String, file_path: &String, index: usize) {
+fn mark_done(mut data: Vec<Context>, args: &String, config: &Config, index: usize) {
     let ids = parse_ids(parse_args(args));
 
     data[index].tasks = data[index]
@@ -287,16 +345,16 @@ fn mark_done(mut data: Vec<Context>, args: &String, file_path: &String, index: u
         })
         .collect();
 
-    write_to_file(data, file_path);
+    write_to_file(data, &config);
 }
 
-fn clear_tasks(mut data: Vec<Context>, file_path: &String, index: usize) {
+fn clear_tasks(mut data: Vec<Context>, config: &Config, index: usize) {
     data[index].tasks = vec![];
 
-    write_to_file(data, file_path)
+    write_to_file(data, &config)
 }
 
-fn del_context(data: Vec<Context>, args: &String, file_path: &String, index: usize) {
+fn del_context(data: Vec<Context>, args: &String, config: &Config, index: usize) {
     let ctx_names = parse_args(args);
     let active_deleted = ctx_names.contains(&data[index].name.as_str());
 
@@ -309,7 +367,7 @@ fn del_context(data: Vec<Context>, args: &String, file_path: &String, index: usi
         updated_data[0].active = true;
     }
 
-    write_to_file(updated_data, file_path);
+    write_to_file(updated_data, &config);
 }
 
 fn list_contexts(data: Vec<Context>) {
