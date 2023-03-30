@@ -41,6 +41,7 @@ impl Context {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(default)]
 struct Config {
     ssh_ip: String,
     ssh_username: String,
@@ -61,7 +62,8 @@ impl ::std::default::Default for Config {
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let mut config: Config = confy::load("tasks", "config").unwrap();
+    let mut config: Config =
+        confy::load("tasks", "config").expect("Error when loading the config file");
 
     if args.len() < 2 {
         print_help();
@@ -192,9 +194,7 @@ fn get_or_create_data_file_ssh(config: &Config) -> Result<Vec<Context>, ()> {
             Ok(contexts)
         }
         Err(_) => {
-            let mut file = sftp
-                .create(path)
-                .expect("Impossible to write on remote file");
+            let mut file = sftp.create(path).expect("Error when creating file");
 
             file.write("[]".as_bytes())
                 .expect("Error when writing to file");
