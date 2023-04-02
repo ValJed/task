@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use ssh2::{Session, Sftp};
 use std::net::TcpStream;
 
-use std::fs::{create_dir, create_dir_all, File};
+use std::fs::{create_dir_all, File};
 use std::io::BufReader;
 use std::io::Write;
 use std::path::Path;
