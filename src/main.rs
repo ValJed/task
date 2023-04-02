@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use ssh2::{Session, Sftp};
 use std::net::TcpStream;
 
-use std::fs::{create_dir, File};
+use std::fs::{create_dir, create_dir_all, File};
 use std::io::BufReader;
 use std::io::Write;
 use std::path::Path;
@@ -70,7 +70,7 @@ fn main() {
         return;
     }
 
-    let [file_path, folder_path] = get_file_paths(&config.local_file_path);
+    let [file_path, folder_path] = get_file_paths(&config);
     config.local_file_path = file_path;
 
     let data_res = if config.ssh_ip.is_empty() {
@@ -128,14 +128,30 @@ fn use_context(mut data: Vec<Context>, name: &String, config: &Config) {
 
     write_to_file(updated_data, config)
 }
-
-fn get_file_paths(local_file_path: &String) -> [String; 2] {
-    let user = env::var("USER").expect("No user set on this machine");
-    let folder_path = if local_file_path.is_empty() {
-        format!("/home/{user}/.local/share/tasks")
+fn normalize_path(path: &String, starts_with_backslash: bool) -> String {
+    if starts_with_backslash && !path.starts_with("/") {
+        format!("/{path}")
+    } else if !starts_with_backslash && path.starts_with("/") {
+        let mut chars = path.chars();
+        chars.next();
+        chars.collect::<String>()
     } else {
-        local_file_path.to_owned()
+        path.to_owned()
+    }
+}
+
+fn get_file_paths(config: &Config) -> [String; 2] {
+    let folder_path = if config.ssh_ip.is_empty() {
+        if config.local_file_path.is_empty() {
+            let user = env::var("USER").expect("No user set on this machine");
+            format!("/home/{user}/.local/share/tasks")
+        } else {
+            normalize_path(&config.local_file_path, true)
+        }
+    } else {
+        normalize_path(&config.ssh_file_path, false)
     };
+
     let file_path = format!("{folder_path}/tasks.json");
 
     [file_path, folder_path]
@@ -144,14 +160,14 @@ fn get_file_paths(local_file_path: &String) -> [String; 2] {
 fn get_sftp(config: &Config) -> Result<Sftp, ()> {
     // Connect to the local SSH server
     let tcp = TcpStream::connect(&config.ssh_ip).expect("TCP connection failed");
-    let mut sess = Session::new().expect("Erro while creating TCP Session");
+    let mut sess = Session::new().expect("Error while creating TCP Session");
 
     sess.set_tcp_stream(tcp);
-    sess.handshake().unwrap();
+    sess.handshake().expect("Error with the TCP connection");
 
     // Try to authenticate with the first identity in the agent.
-    sess.userauth_agent(&config.ssh_username).unwrap();
-
+    sess.userauth_agent(&config.ssh_username)
+        .expect("Error when setting user agent, you might need to add ssh key to ssh-agent");
     if !sess.authenticated() {
         println!("Authentication failed");
         return Err(());
@@ -182,7 +198,6 @@ fn get_or_create_data_file_ssh(config: &Config) -> Result<Vec<Context>, ()> {
     let sftp = sftp_res.unwrap();
     let path_str = get_remote_path(&config);
     let path = Path::new(&path_str);
-
     let file_res = sftp.open(path);
 
     match file_res {
@@ -211,7 +226,7 @@ fn get_or_create_data_file(file: &String, folder: String) -> Vec<Context> {
     let file_path = Path::new(file.as_str());
 
     if !folder_path.exists() {
-        create_dir(folder_path).expect("Error when creating folder tasks");
+        create_dir_all(folder_path).expect("Error when creating folder tasks");
     }
 
     if !file_path.is_file() {
