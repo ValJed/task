@@ -1,6 +1,9 @@
 # Tasks
 
 Tiny tasks CLI in Rust.
+Supports ssh2 to read and write on remote file.
+
+## Usage
 
 <pre>
 Usage:
@@ -16,3 +19,34 @@ tasks clear                   deletes one or several contexts (separated by a co
 OPTIONS:
 -h, --help                    shows help
 </pre>
+
+## Storing the data file locally
+
+By default, the data file is stored under `/home/{USER}/.local/share/tasks/tasks.json`.
+You can modify this behavior by setting you own `ssh_local_path` in the config:
+
+```toml
+local_file_path = '/opt/tasks'
+```
+
+## Storing data file remotely with SSH
+
+You can use a remote file to store your data file in order to use the same one whatever the device your on.
+It supports ssh2.
+
+To do that you simply need to  update the config file:
+
+```toml
+ssh_ip = '666.66.66.666:22' 
+ssh_username = 'root'
+ssh_file_path = 'apps/tasks'
+```
+`ssh_ip` is The IP of the remote server you want to connect to (you'll need the port which is 22 by default).
+`ssh_username` is the user name of the server you want to connect with (which is often `root` by default).
+`ssh_file_path` is the location where you want to store the `tasks` data file.
+
+The ssh connection uses ssh-agent ro get the right ssh key.
+You might need to run this command to add your ssh key to ssh-agent:
+```bash
+eval `ssh-agent -s` && ssh-add # You can specify the name of the key if you are using a different one
+```
