@@ -1,6 +1,6 @@
 # Tasks
 
-Tiny tasks CLI in Rust.
+Tiny tasks CLI in Rust for unix based systems.
 Supports ssh2 to read and write on remote file.
 
 ## Usage
@@ -20,7 +20,7 @@ OPTIONS:
 -h, --help                    shows help
 </pre>
 
-## Storing the data file locally
+## Storing data file locally
 
 By default, the data file is stored under `/home/{USER}/.local/share/tasks/tasks.json`.
 You can modify this behavior by setting you own `ssh_local_path` in the config:
