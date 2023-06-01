@@ -9,6 +9,7 @@ Supports ssh2 to read and write on remote file.
 Usage:
 tasks use                     uses or creates new context
 tasks ls                      shows the list of tasks
+tasks lsa                     shows the list of all tasks from all contexts
 tasks lsc                     shows the list of contexts
 tasks add "{content}"         creates task based on content string
 tasks done {id}               marks one or several tasks (separated by a comma) as done 
