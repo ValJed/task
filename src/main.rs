@@ -101,7 +101,8 @@ fn main() {
         "add" => add_task(data, &args[2], &config, ctx_index),
         "rm" => del_task(data, &args[2], &config, ctx_index),
         "rmc" => del_context(data, &args[2], &config, ctx_index),
-        "ls" => list_tasks(data, ctx_index),
+        "ls" => list_tasks(data, ctx_index, false),
+        "lsa" => list_tasks(data, ctx_index, true),
         "lsc" => list_contexts(data),
         "done" => mark_done(data, &args[2], &config, ctx_index),
         "clear" => clear_tasks(data, &config, ctx_index),
@@ -315,15 +316,26 @@ fn del_task(mut data: Vec<Context>, args: &String, config: &Config, index: usize
     write_to_file(data, &config);
 }
 
-fn list_tasks(data: Vec<Context>, index: usize) {
+fn list_tasks(data: Vec<Context>, index: usize, all: bool) {
+    if all {
+        for ctx in &data {
+            print_table(&ctx);
+        }
+    } else {
+        print_table(&data[index]);
+    }
+}
+
+fn print_table(ctx: &Context) {
     let mut table = Table::new();
+
     table
         .load_preset(UTF8_FULL)
         .apply_modifier(UTF8_ROUND_CORNERS);
 
-    table.set_header(vec![Cell::new(&data[index].name)]);
+    table.set_header(vec![Cell::new(&ctx.name)]);
 
-    for task in &data[index].tasks {
+    for task in &ctx.tasks {
         let check = if task.done {
             "[X]".to_string()
         } else {
@@ -337,11 +349,11 @@ fn list_tasks(data: Vec<Context>, index: usize) {
         ]);
     }
 
-    if data[index].tasks.len() == 0 {
-        table.add_row(vec![Cell::new("Let's chill, or get to work maybe?")]);
+    if ctx.tasks.len() == 0 {
+        table.add_row(vec![Cell::new("No tasks, are you lazy or too efficient?")]);
     }
 
-    println!("{table}")
+    println!("{table}");
 }
 
 fn mark_done(mut data: Vec<Context>, args: &String, config: &Config, index: usize) {
