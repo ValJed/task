@@ -47,6 +47,7 @@ struct Config {
     ssh_username: String,
     ssh_file_path: String,
     local_file_path: String,
+    max_line_lengh: usize,
 }
 
 impl ::std::default::Default for Config {
@@ -56,6 +57,7 @@ impl ::std::default::Default for Config {
             ssh_username: "".into(),
             ssh_file_path: "".into(),
             local_file_path: "".into(),
+            max_line_lengh: 40,
         }
     }
 }
@@ -101,8 +103,8 @@ fn main() {
         "add" => add_task(data, &args[2], &config, ctx_index),
         "rm" => del_task(data, &args[2], &config, ctx_index),
         "rmc" => del_context(data, &args[2], &config, ctx_index),
-        "ls" => list_tasks(data, ctx_index, false),
-        "lsa" => list_tasks(data, ctx_index, true),
+        "ls" => list_tasks(data, ctx_index, &config, false),
+        "lsa" => list_tasks(data, ctx_index, &config, true),
         "lsc" => list_contexts(data),
         "done" => mark_done(data, &args[2], &config, ctx_index),
         "clear" => clear_tasks(data, &config, ctx_index),
@@ -249,6 +251,8 @@ fn get_or_create_data_file(file: &String, folder: String) -> Vec<Context> {
 fn add_task(mut data: Vec<Context>, to_add: &String, config: &Config, index: usize) {
     let date = Local::now();
 
+    println!("to_add: {:?}", to_add);
+
     let task: Task = Task {
         id: data[index].tasks.len() + 1,
         name: to_add.to_owned(),
@@ -316,17 +320,17 @@ fn del_task(mut data: Vec<Context>, args: &String, config: &Config, index: usize
     write_to_file(data, &config);
 }
 
-fn list_tasks(data: Vec<Context>, index: usize, all: bool) {
+fn list_tasks(data: Vec<Context>, index: usize, config: &Config, all: bool) {
     if all {
         for ctx in &data {
-            print_table(&ctx);
+            print_table(&ctx, &config);
         }
     } else {
-        print_table(&data[index]);
+        print_table(&data[index], &config);
     }
 }
 
-fn print_table(ctx: &Context) {
+fn print_table(ctx: &Context, config: &Config) {
     let mut table = Table::new();
 
     table
@@ -342,10 +346,12 @@ fn print_table(ctx: &Context) {
             "[]".to_string()
         };
 
+        let splitted_line = split_line(task.name.to_owned(), &config.max_line_lengh);
+
         table.add_row(vec![
             Cell::new(task.id.to_owned()),
             Cell::new(check),
-            Cell::new(task.name.to_owned()),
+            Cell::new(splitted_line),
         ]);
     }
 
@@ -354,6 +360,29 @@ fn print_table(ctx: &Context) {
     }
 
     println!("{table}");
+}
+
+fn split_line(line: String, max_line_length: &usize) -> String {
+    if line.len() < *max_line_length {
+        return line;
+    }
+
+    let mut splitted = String::new();
+    let mut line_length = 0;
+
+    for char in line.chars() {
+        line_length += 1;
+        println!("char: {:?} {:?}", char, line_length);
+        if char == ' ' && line_length > *max_line_length {
+            splitted.push('\n');
+            line_length = 0;
+        } else {
+            splitted.push(char);
+        }
+    }
+
+    println!("splitted: {:?}", splitted);
+    splitted
 }
 
 fn mark_done(mut data: Vec<Context>, args: &String, config: &Config, index: usize) {
