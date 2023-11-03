@@ -4,11 +4,12 @@ use comfy_table::presets::UTF8_FULL;
 use comfy_table::{Cell, Table};
 use serde::{Deserialize, Serialize};
 use ssh2::{Session, Sftp};
-use std::net::TcpStream;
+use terminal_size::{terminal_size, Height, Width};
 
 use std::fs::{create_dir_all, File};
 use std::io::BufReader;
 use std::io::Write;
+use std::net::TcpStream;
 use std::path::Path;
 use std::{env, vec};
 
@@ -47,6 +48,7 @@ struct Config {
     ssh_username: String,
     ssh_file_path: String,
     local_file_path: String,
+    max_line_lengh: usize,
 }
 
 impl ::std::default::Default for Config {
@@ -56,9 +58,14 @@ impl ::std::default::Default for Config {
             ssh_username: "".into(),
             ssh_file_path: "".into(),
             local_file_path: "".into(),
+            max_line_lengh: get_terminal_width(),
         }
     }
 }
+
+const DEFAULT_LINE_LENGTH: usize = 50;
+const LAYOUT: usize = 15;
+const LINE_LEN_FALLBACK: usize = 10;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -101,8 +108,8 @@ fn main() {
         "add" => add_task(data, &args[2], &config, ctx_index),
         "rm" => del_task(data, &args[2], &config, ctx_index),
         "rmc" => del_context(data, &args[2], &config, ctx_index),
-        "ls" => list_tasks(data, ctx_index, false),
-        "lsa" => list_tasks(data, ctx_index, true),
+        "ls" => list_tasks(data, ctx_index, &config, false),
+        "lsa" => list_tasks(data, ctx_index, &config, true),
         "lsc" => list_contexts(data),
         "done" => mark_done(data, &args[2], &config, ctx_index),
         "clear" => clear_tasks(data, &config, ctx_index),
@@ -316,24 +323,28 @@ fn del_task(mut data: Vec<Context>, args: &String, config: &Config, index: usize
     write_to_file(data, &config);
 }
 
-fn list_tasks(data: Vec<Context>, index: usize, all: bool) {
+fn list_tasks(data: Vec<Context>, index: usize, config: &Config, all: bool) {
     if all {
         for ctx in &data {
-            print_table(&ctx);
+            print_table(&ctx, &config);
         }
     } else {
-        print_table(&data[index]);
+        print_table(&data[index], &config);
     }
 }
 
-fn print_table(ctx: &Context) {
+fn print_table(ctx: &Context, config: &Config) {
     let mut table = Table::new();
 
     table
         .load_preset(UTF8_FULL)
         .apply_modifier(UTF8_ROUND_CORNERS);
 
-    table.set_header(vec![Cell::new(&ctx.name)]);
+    table.set_header(vec![
+        Cell::new(""),
+        Cell::new(""),
+        Cell::new(&break_line(ctx.name.to_owned(), &config.max_line_lengh)),
+    ]);
 
     for task in &ctx.tasks {
         let check = if task.done {
@@ -342,10 +353,12 @@ fn print_table(ctx: &Context) {
             "[]".to_string()
         };
 
+        let splitted_line = break_line(task.name.to_owned(), &config.max_line_lengh);
+
         table.add_row(vec![
             Cell::new(task.id.to_owned()),
             Cell::new(check),
-            Cell::new(task.name.to_owned()),
+            Cell::new(splitted_line),
         ]);
     }
 
@@ -354,6 +367,33 @@ fn print_table(ctx: &Context) {
     }
 
     println!("{table}");
+}
+
+fn break_line(line: String, max_line_length: &usize) -> String {
+    if line.len() < *max_line_length {
+        return line;
+    }
+    let mut position = 0;
+    let mut formatted = String::new();
+
+    loop {
+        let end = position + max_line_length;
+        if end >= line.len() {
+            let substring = &line[position..line.len()];
+            formatted.push_str(substring);
+            break;
+        }
+
+        let substring = &line[position..end];
+        let space_pos = substring.rfind(' ').unwrap_or(substring.len());
+        let space = if space_pos != substring.len() { 1 } else { 0 };
+        let mut updated = substring.to_string();
+        updated.replace_range(space_pos.., "\n");
+        formatted.push_str(updated.as_str());
+        position += space_pos + space;
+    }
+
+    formatted
 }
 
 fn mark_done(mut data: Vec<Context>, args: &String, config: &Config, index: usize) {
@@ -440,6 +480,20 @@ fn parse_ids(ids: Vec<&str>) -> Vec<usize> {
             }
         })
         .collect()
+}
+
+fn get_terminal_width() -> usize {
+    let size = terminal_size();
+    if let Some((Width(w), Height(_))) = size {
+        let width = usize::from(w);
+        if width < (LAYOUT + LINE_LEN_FALLBACK) {
+            return LINE_LEN_FALLBACK;
+        }
+
+        width - LAYOUT
+    } else {
+        DEFAULT_LINE_LENGTH
+    }
 }
 
 fn print_help() {
