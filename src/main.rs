@@ -4,11 +4,12 @@ use comfy_table::presets::UTF8_FULL;
 use comfy_table::{Cell, Table};
 use serde::{Deserialize, Serialize};
 use ssh2::{Session, Sftp};
-use std::net::TcpStream;
+use terminal_size::{terminal_size, Height, Width};
 
 use std::fs::{create_dir_all, File};
 use std::io::BufReader;
 use std::io::Write;
+use std::net::TcpStream;
 use std::path::Path;
 use std::{env, vec};
 
@@ -57,10 +58,14 @@ impl ::std::default::Default for Config {
             ssh_username: "".into(),
             ssh_file_path: "".into(),
             local_file_path: "".into(),
-            max_line_lengh: 40,
+            max_line_lengh: get_terminal_width(),
         }
     }
 }
+
+const DEFAULT_LINE_LENGTH: usize = 50;
+const LAYOUT: usize = 15;
+const LINE_LEN_FALLBACK: usize = 10;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -251,8 +256,6 @@ fn get_or_create_data_file(file: &String, folder: String) -> Vec<Context> {
 fn add_task(mut data: Vec<Context>, to_add: &String, config: &Config, index: usize) {
     let date = Local::now();
 
-    println!("to_add: {:?}", to_add);
-
     let task: Task = Task {
         id: data[index].tasks.len() + 1,
         name: to_add.to_owned(),
@@ -337,7 +340,11 @@ fn print_table(ctx: &Context, config: &Config) {
         .load_preset(UTF8_FULL)
         .apply_modifier(UTF8_ROUND_CORNERS);
 
-    table.set_header(vec![Cell::new(&ctx.name)]);
+    table.set_header(vec![
+        Cell::new(""),
+        Cell::new(""),
+        Cell::new(&break_line(ctx.name.to_owned(), &config.max_line_lengh)),
+    ]);
 
     for task in &ctx.tasks {
         let check = if task.done {
@@ -346,7 +353,7 @@ fn print_table(ctx: &Context, config: &Config) {
             "[]".to_string()
         };
 
-        let splitted_line = split_line(task.name.to_owned(), &config.max_line_lengh);
+        let splitted_line = break_line(task.name.to_owned(), &config.max_line_lengh);
 
         table.add_row(vec![
             Cell::new(task.id.to_owned()),
@@ -362,27 +369,31 @@ fn print_table(ctx: &Context, config: &Config) {
     println!("{table}");
 }
 
-fn split_line(line: String, max_line_length: &usize) -> String {
+fn break_line(line: String, max_line_length: &usize) -> String {
     if line.len() < *max_line_length {
         return line;
     }
+    let mut position = 0;
+    let mut formatted = String::new();
 
-    let mut splitted = String::new();
-    let mut line_length = 0;
-
-    for char in line.chars() {
-        line_length += 1;
-        println!("char: {:?} {:?}", char, line_length);
-        if char == ' ' && line_length > *max_line_length {
-            splitted.push('\n');
-            line_length = 0;
-        } else {
-            splitted.push(char);
+    loop {
+        let end = position + max_line_length;
+        if end >= line.len() {
+            let substring = &line[position..line.len()];
+            formatted.push_str(substring);
+            break;
         }
+
+        let substring = &line[position..end];
+        let space_pos = substring.rfind(' ').unwrap_or(substring.len());
+        let space = if space_pos != substring.len() { 1 } else { 0 };
+        let mut updated = substring.to_string();
+        updated.replace_range(space_pos.., "\n");
+        formatted.push_str(updated.as_str());
+        position += space_pos + space;
     }
 
-    println!("splitted: {:?}", splitted);
-    splitted
+    formatted
 }
 
 fn mark_done(mut data: Vec<Context>, args: &String, config: &Config, index: usize) {
@@ -469,6 +480,20 @@ fn parse_ids(ids: Vec<&str>) -> Vec<usize> {
             }
         })
         .collect()
+}
+
+fn get_terminal_width() -> usize {
+    let size = terminal_size();
+    if let Some((Width(w), Height(_))) = size {
+        let width = usize::from(w);
+        if width < (LAYOUT + LINE_LEN_FALLBACK) {
+            return LINE_LEN_FALLBACK;
+        }
+
+        width - LAYOUT
+    } else {
+        DEFAULT_LINE_LENGTH
+    }
 }
 
 fn print_help() {
