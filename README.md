@@ -46,7 +46,7 @@ ssh_file_path = 'apps/tasks'
 `ssh_username` is the user name of the server you want to connect with (which is often `root` by default).
 `ssh_file_path` is the location where you want to store the `tasks` data file.
 
-The ssh connection uses ssh-agent ro get the right ssh key.
+The ssh connection uses ssh-agent to get the right ssh key.
 You might need to run this command to add your ssh key to ssh-agent:
 ```bash
 eval `ssh-agent -s` && ssh-add # You can specify the name of the key if you are using a different one
