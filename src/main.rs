@@ -363,7 +363,14 @@ fn print_table(ctx: &Context, config: &Config) {
     }
 
     if ctx.tasks.len() == 0 {
-        table.add_row(vec![Cell::new("No tasks, are you lazy or too efficient?")]);
+        table.add_row(vec![
+            Cell::new(""),
+            Cell::new(""),
+            Cell::new(break_line(
+                "No tasks, are you lazy or too efficient?".into(),
+                &config.max_line_lengh,
+            )),
+        ]);
     }
 
     println!("{table}");
