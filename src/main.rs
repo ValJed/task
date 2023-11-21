@@ -13,6 +13,11 @@ use std::net::TcpStream;
 use std::path::Path;
 use std::{env, vec};
 
+mod args;
+
+use args::Cli;
+use clap::Parser;
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct Task {
     id: usize,
@@ -69,13 +74,14 @@ const LINE_LEN_FALLBACK: usize = 10;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
+    let cli = Cli::parse();
     let mut config: Config =
         confy::load("tasks", "config").expect("Error when loading the config file");
 
-    if args.len() < 2 {
-        print_help();
-        return;
-    }
+    // if args.len() < 2 {
+    //     print_help();
+    //     return;
+    // }
 
     let [file_path, folder_path] = get_file_paths(&config);
     config.local_file_path = file_path;
