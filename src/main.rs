@@ -108,7 +108,8 @@ fn main() {
     let ctx_index = active_index.unwrap();
 
     if cli.command.is_none() {
-        println!("");
+        list_tasks(data, ctx_index, &config, true);
+        return;
     }
 
     match &cli.command.unwrap() {
@@ -124,8 +125,7 @@ fn main() {
     }
 }
 
-fn use_context(mut data: Vec<Context>, name_opt: Option<String>, config: &Config) {
-    let name = name_opt.expect("You must specify a context name");
+fn use_context(mut data: Vec<Context>, name: String, config: &Config) {
     let exists = data.iter().find(|ctx| ctx.name == name.to_owned());
 
     if exists.is_none() {
@@ -261,8 +261,7 @@ fn get_or_create_data_file(file: &String, folder: String) -> Vec<Context> {
     contexts
 }
 
-fn add_task(mut data: Vec<Context>, task_opt: Option<String>, config: &Config, index: usize) {
-    let task = task_opt.expect("You must specify a task description");
+fn add_task(mut data: Vec<Context>, task: String, config: &Config, index: usize) {
     let date = Local::now();
 
     let task: Task = Task {
@@ -309,8 +308,7 @@ fn write_to_file(data: Vec<Context>, config: &Config) {
     file.close().unwrap();
 }
 
-fn del_task(mut data: Vec<Context>, args_opt: Option<String>, config: &Config, index: usize) {
-    let args = args_opt.expect("You must specify one or multiple task IDs to delete");
+fn del_task(mut data: Vec<Context>, args: String, config: &Config, index: usize) {
     let ids = parse_ids(parse_args(&args));
     let mut counter = 0;
 
@@ -413,8 +411,7 @@ fn break_line(line: String, max_line_length: &usize) -> String {
     formatted
 }
 
-fn mark_done(mut data: Vec<Context>, args_opt: Option<String>, config: &Config, index: usize) {
-    let args = args_opt.expect("You must specify one or multiple task IDs to mark done");
+fn mark_done(mut data: Vec<Context>, args: String, config: &Config, index: usize) {
     let ids = parse_ids(parse_args(&args));
 
     data[index].tasks = data[index]
@@ -439,8 +436,7 @@ fn clear_tasks(mut data: Vec<Context>, config: &Config, index: usize) {
     write_to_file(data, &config)
 }
 
-fn del_context(data: Vec<Context>, args_opt: Option<String>, config: &Config, index: usize) {
-    let args = args_opt.expect("You must specify a context name to delete");
+fn del_context(data: Vec<Context>, args: String, config: &Config, index: usize) {
     let ctx_names = parse_args(&args);
     let active_deleted = ctx_names.contains(&data[index].name.as_str());
 
@@ -514,18 +510,3 @@ fn get_terminal_width() -> usize {
         DEFAULT_LINE_LENGTH
     }
 }
-
-// fn print_help() {
-//     println!("Tiny tasks CLI in Rust.\n");
-//     println!("Usage:");
-//     println!("  tasks use                         uses or creates new context");
-//     println!("  tasks ls                          shows the list of tasks");
-//     println!("  tasks lsc                         shows the list of contexts");
-//     println!("  tasks add \"{{content}}\"             creates task based on content string");
-//     println!("  tasks done {{id}}                   marks one or several tasks (separated by a comma) as done");
-//     println!("  tasks rm {{id}}                     deletes one or several tasks (separated by a comma) based on the id");
-//     println!("  tasks rmc {{name}}                  deletes one or several contexts (separated by a comma) based on the name");
-//     println!("  tasks clear                       clear all tasks for active context\n");
-//     println!("OPTIONS:");
-//     println!("  -h, --help                        shows help");
-// }

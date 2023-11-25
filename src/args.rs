@@ -6,8 +6,6 @@ use clap::{Args, Parser, Subcommand};
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Commands>,
-
-    pub name: Option<String>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -34,5 +32,5 @@ pub enum Commands {
 
 #[derive(Args, Debug)]
 pub struct TaskArgs {
-    pub name: Option<String>,
+    pub name: String,
 }
