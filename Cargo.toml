@@ -1,5 +1,5 @@
 [package]
-name = "tasks"
+name = "task"
 version = "1.3.0"
 edition = "2021"
 author = "Val jed. vjeudy@protonmail.com"

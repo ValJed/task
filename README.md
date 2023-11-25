@@ -1,4 +1,4 @@
-# Tasks
+# Task
 
 Tiny tasks CLI in Rust for unix based systems.
 Supports ssh2 to read and write on remote file.
