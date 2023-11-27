@@ -1,11 +1,16 @@
 use clap::{Args, Parser, Subcommand};
+use clap_complete::Shell;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 #[command(propagate_version = true)]
+#[command(name = "completion-derive")]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Commands>,
+
+    #[arg(long = "generate", value_enum)]
+    pub generator: Option<Shell>,
 }
 
 #[derive(Subcommand, Debug)]

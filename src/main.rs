@@ -1,4 +1,6 @@
 use chrono::Local;
+use clap::{Command, CommandFactory};
+use clap_complete::{generate, Generator};
 use comfy_table::modifiers::UTF8_ROUND_CORNERS;
 use comfy_table::presets::UTF8_FULL;
 use comfy_table::{Cell, Table};
@@ -7,11 +9,10 @@ use ssh2::{Session, Sftp};
 use terminal_size::{terminal_size, Height, Width};
 
 use std::fs::{create_dir_all, File};
-use std::io::BufReader;
-use std::io::Write;
+use std::io::{BufReader, Write};
 use std::net::TcpStream;
 use std::path::Path;
-use std::{env, vec};
+use std::{env, io, vec};
 
 mod args;
 
@@ -77,6 +78,15 @@ fn main() {
     let mut config: Config =
         confy::load("tasks", "config").expect("Error when loading the config file");
 
+    let mut cmd = Cli::command();
+    println!("cmd: {:?}", cmd.get_name());
+    if let Some(generator) = cli.generator {
+        eprintln!("Generating completion file for {generator:?}...");
+        println!("generator: {:?}", generator);
+        print_completions(generator, &mut cmd);
+        return;
+    }
+
     let [file_path, folder_path] = get_file_paths(&config);
     config.local_file_path = file_path;
 
@@ -108,7 +118,7 @@ fn main() {
     let ctx_index = active_index.unwrap();
 
     if cli.command.is_none() {
-        list_tasks(data, ctx_index, &config, true);
+        list_tasks(data, ctx_index, &config, false);
         return;
     }
 
@@ -123,6 +133,10 @@ fn main() {
         Commands::Done(cmd) => mark_done(data, cmd.name.clone(), &config, ctx_index),
         Commands::Clear => clear_tasks(data, &config, ctx_index),
     }
+}
+
+fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
+    generate(gen, cmd, cmd.get_name().to_string(), &mut io::stdout());
 }
 
 fn use_context(mut data: Vec<Context>, name: String, config: &Config) {
