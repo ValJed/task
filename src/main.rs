@@ -1,4 +1,6 @@
 use chrono::Local;
+use clap::{Command, CommandFactory};
+use clap_complete::{generate, Generator};
 use comfy_table::modifiers::UTF8_ROUND_CORNERS;
 use comfy_table::presets::UTF8_FULL;
 use comfy_table::{Cell, Table};
@@ -7,11 +9,15 @@ use ssh2::{Session, Sftp};
 use terminal_size::{terminal_size, Height, Width};
 
 use std::fs::{create_dir_all, File};
-use std::io::BufReader;
-use std::io::Write;
+use std::io::{BufReader, Write};
 use std::net::TcpStream;
 use std::path::Path;
-use std::{env, vec};
+use std::{env, io, vec};
+
+mod args;
+
+use args::{Cli, Commands};
+use clap::Parser;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct Task {
@@ -68,12 +74,13 @@ const LAYOUT: usize = 15;
 const LINE_LEN_FALLBACK: usize = 10;
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
+    let cli = Cli::parse();
     let mut config: Config =
         confy::load("tasks", "config").expect("Error when loading the config file");
 
-    if args.len() < 2 {
-        print_help();
+    let mut cmd = Cli::command();
+    if let Some(generator) = cli.generator {
+        print_completions(generator, &mut cmd);
         return;
     }
 
@@ -96,32 +103,44 @@ fn main() {
     let data = data_res.unwrap();
     let active_index = data.iter().position(|context| context.active == true);
 
-    if active_index.is_none() && args[1] != "use" {
-        println!("No current active context, let's create one using tasks use {{name}}");
-        return;
-    };
+    if let Some(ref command) = cli.command {
+        if let Commands::Use(_) = command {
+            if active_index.is_none() {
+                println!("No current active context, let's create one using tasks use {{name}}");
+                return;
+            }
+        }
+    }
 
     let ctx_index = active_index.unwrap();
 
-    match args[1].as_str() {
-        "use" => use_context(data, &args[2], &config),
-        "add" => add_task(data, &args[2], &config, ctx_index),
-        "rm" => del_task(data, &args[2], &config, ctx_index),
-        "rmc" => del_context(data, &args[2], &config, ctx_index),
-        "ls" => list_tasks(data, ctx_index, &config, false),
-        "lsa" => list_tasks(data, ctx_index, &config, true),
-        "lsc" => list_contexts(data),
-        "done" => mark_done(data, &args[2], &config, ctx_index),
-        "clear" => clear_tasks(data, &config, ctx_index),
-        _ => print_help(),
+    if cli.command.is_none() {
+        list_tasks(data, ctx_index, &config, false);
+        return;
+    }
+
+    match &cli.command.unwrap() {
+        Commands::Use(cmd) => use_context(data, cmd.name.clone(), &config),
+        Commands::Add(cmd) => add_task(data, cmd.name.clone(), &config, ctx_index),
+        Commands::Rm(cmd) => del_task(data, cmd.name.clone(), &config, ctx_index),
+        Commands::Rmc(cmd) => del_context(data, cmd.name.clone(), &config, ctx_index),
+        Commands::Ls => list_tasks(data, ctx_index, &config, false),
+        Commands::Lsa => list_tasks(data, ctx_index, &config, true),
+        Commands::Lsc => list_contexts(data),
+        Commands::Done(cmd) => mark_done(data, cmd.name.clone(), &config, ctx_index),
+        Commands::Clear => clear_tasks(data, &config, ctx_index),
     }
 }
 
-fn use_context(mut data: Vec<Context>, name: &String, config: &Config) {
+fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
+    generate(gen, cmd, cmd.get_name().to_string(), &mut io::stdout());
+}
+
+fn use_context(mut data: Vec<Context>, name: String, config: &Config) {
     let exists = data.iter().find(|ctx| ctx.name == name.to_owned());
 
     if exists.is_none() {
-        let new_context = Context::new(name, data.len());
+        let new_context = Context::new(&name, data.len());
         data.push(new_context);
     }
 
@@ -253,12 +272,12 @@ fn get_or_create_data_file(file: &String, folder: String) -> Vec<Context> {
     contexts
 }
 
-fn add_task(mut data: Vec<Context>, to_add: &String, config: &Config, index: usize) {
+fn add_task(mut data: Vec<Context>, task: String, config: &Config, index: usize) {
     let date = Local::now();
 
     let task: Task = Task {
         id: data[index].tasks.len() + 1,
-        name: to_add.to_owned(),
+        name: task,
         done: false,
         creation_date: date.to_string(),
         modification_date: date.to_string(),
@@ -300,8 +319,8 @@ fn write_to_file(data: Vec<Context>, config: &Config) {
     file.close().unwrap();
 }
 
-fn del_task(mut data: Vec<Context>, args: &String, config: &Config, index: usize) {
-    let ids = parse_ids(parse_args(args));
+fn del_task(mut data: Vec<Context>, args: String, config: &Config, index: usize) {
+    let ids = parse_ids(parse_args(&args));
     let mut counter = 0;
 
     let active_tasks = data[index].tasks.clone();
@@ -403,8 +422,8 @@ fn break_line(line: String, max_line_length: &usize) -> String {
     formatted
 }
 
-fn mark_done(mut data: Vec<Context>, args: &String, config: &Config, index: usize) {
-    let ids = parse_ids(parse_args(args));
+fn mark_done(mut data: Vec<Context>, args: String, config: &Config, index: usize) {
+    let ids = parse_ids(parse_args(&args));
 
     data[index].tasks = data[index]
         .tasks
@@ -428,8 +447,8 @@ fn clear_tasks(mut data: Vec<Context>, config: &Config, index: usize) {
     write_to_file(data, &config)
 }
 
-fn del_context(data: Vec<Context>, args: &String, config: &Config, index: usize) {
-    let ctx_names = parse_args(args);
+fn del_context(data: Vec<Context>, args: String, config: &Config, index: usize) {
+    let ctx_names = parse_args(&args);
     let active_deleted = ctx_names.contains(&data[index].name.as_str());
 
     let mut updated_data: Vec<Context> = data
@@ -501,19 +520,4 @@ fn get_terminal_width() -> usize {
     } else {
         DEFAULT_LINE_LENGTH
     }
-}
-
-fn print_help() {
-    println!("Tiny tasks CLI in Rust.\n");
-    println!("Usage:");
-    println!("  tasks use                         uses or creates new context");
-    println!("  tasks ls                          shows the list of tasks");
-    println!("  tasks lsc                         shows the list of contexts");
-    println!("  tasks add \"{{content}}\"             creates task based on content string");
-    println!("  tasks done {{id}}                   marks one or several tasks (separated by a comma) as done");
-    println!("  tasks rm {{id}}                     deletes one or several tasks (separated by a comma) based on the id");
-    println!("  tasks rmc {{name}}                  deletes one or several contexts (separated by a comma) based on the name");
-    println!("  tasks clear                       clear all tasks for active context\n");
-    println!("OPTIONS:");
-    println!("  -h, --help                        shows help");
 }
