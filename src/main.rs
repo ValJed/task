@@ -79,10 +79,7 @@ fn main() {
         confy::load("tasks", "config").expect("Error when loading the config file");
 
     let mut cmd = Cli::command();
-    println!("cmd: {:?}", cmd.get_name());
     if let Some(generator) = cli.generator {
-        eprintln!("Generating completion file for {generator:?}...");
-        println!("generator: {:?}", generator);
         print_completions(generator, &mut cmd);
         return;
     }

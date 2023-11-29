@@ -4,7 +4,7 @@ use clap_complete::Shell;
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 #[command(propagate_version = true)]
-#[command(name = "completion-derive")]
+#[command(name = "task")]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Commands>,
