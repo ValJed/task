@@ -343,6 +343,7 @@ fn del_task(mut data: Vec<Context>, args: String, config: &Config, index: usize)
 }
 
 fn list_tasks(data: Vec<Context>, index: usize, config: &Config, all: bool) {
+    println!("data: {:?}", data);
     if all {
         for ctx in &data {
             print_table(&ctx, &config);
