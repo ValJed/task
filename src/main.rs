@@ -123,7 +123,7 @@ fn main() {
         Commands::Use(cmd) => use_context(data, cmd.name.clone(), &config),
         Commands::Add(cmd) => add_task(data, cmd.name.clone(), &config, ctx_index),
         Commands::Rm(cmd) => del_task(data, cmd.name.clone(), &config, ctx_index),
-        Commands::Rmc(cmd) => del_context(data, cmd.name.clone(), &config, ctx_index),
+        Commands::Rmc(cmd) => del_context(data, cmd.name.clone(), &config),
         Commands::Ls => list_tasks(data, ctx_index, &config, false),
         Commands::Lsa => list_tasks(data, ctx_index, &config, true),
         Commands::Lsc => list_contexts(data),
@@ -447,16 +447,28 @@ fn clear_tasks(mut data: Vec<Context>, config: &Config, index: usize) {
     write_to_file(data, &config)
 }
 
-fn del_context(data: Vec<Context>, args: String, config: &Config, index: usize) {
-    let ctx_names = parse_args(&args);
-    let active_deleted = ctx_names.contains(&data[index].name.as_str());
+fn del_context(data: Vec<Context>, args: String, config: &Config) {
+    let ctx_names_or_ids = parse_args(&args);
 
     let mut updated_data: Vec<Context> = data
         .into_iter()
-        .filter(|ctx| !ctx_names.contains(&ctx.name.as_str()))
+        .enumerate()
+        .filter(|(index, ctx)| {
+            let id = (index + 1).to_string();
+            if ctx_names_or_ids.contains(&ctx.name.as_str())
+                || ctx_names_or_ids.contains(&id.as_str())
+            {
+                return false;
+            }
+
+            true
+        })
+        .map(|(_, ctx)| ctx)
         .collect();
 
-    if active_deleted && !updated_data.get(0).is_none() {
+    let active_ctx = updated_data.iter().find(|ctx| ctx.active);
+
+    if active_ctx.is_none() && !updated_data.get(0).is_none() {
         updated_data[0].active = true;
     }
 
@@ -469,9 +481,10 @@ fn list_contexts(data: Vec<Context>) {
         .load_preset(UTF8_FULL)
         .apply_modifier(UTF8_ROUND_CORNERS);
 
-    for ctx in data.iter() {
+    for (i, ctx) in data.iter().enumerate() {
         let active = if ctx.active { "active" } else { "" };
         table.add_row(vec![
+            (i + 1).to_string(),
             ctx.name.to_owned(),
             format!("{} tasks", ctx.tasks.len()),
             active.to_string(),
