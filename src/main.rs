@@ -55,6 +55,8 @@ struct Config {
     ssh_file_path: String,
     local_file_path: String,
     max_line_lengh: usize,
+    api_url: String,
+    api_key: String,
 }
 
 impl ::std::default::Default for Config {
@@ -65,6 +67,8 @@ impl ::std::default::Default for Config {
             ssh_file_path: "".into(),
             local_file_path: "".into(),
             max_line_lengh: get_terminal_width(),
+            api_url: "".into(),
+            api_key: "".into(),
         }
     }
 }
