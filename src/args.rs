@@ -17,6 +17,10 @@ pub struct Cli {
 pub enum Commands {
     /// uses or creates new context
     Use(TaskArgs),
+    /// edits task content (takes id of the task then its new content)
+    Up(UpdateArgs),
+    /// edits context name (takes id of the new name)
+    Upc(UpdateArgs),
     /// Shows the list of tasks
     Ls,
     /// Shows the list of contexts
@@ -33,6 +37,12 @@ pub enum Commands {
     Rmc(TaskArgs),
     /// Clear all tasks for the active context
     Clear,
+}
+
+#[derive(Args, Debug)]
+pub struct UpdateArgs {
+    pub id: usize,
+    pub name: String,
 }
 
 #[derive(Args, Debug)]

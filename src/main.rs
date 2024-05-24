@@ -28,7 +28,7 @@ struct Task {
     modification_date: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 struct Context {
     id: usize,
     name: String,
@@ -121,6 +121,8 @@ fn main() {
 
     match &cli.command.unwrap() {
         Commands::Use(cmd) => use_context(data, cmd.name.clone(), &config),
+        Commands::Up(cmd) => edit_task(data, cmd.id.clone(), cmd.name.clone(), &config, ctx_index),
+        Commands::Upc(cmd) => edit_context(data, cmd.id.clone(), cmd.name.clone(), &config),
         Commands::Add(cmd) => add_task(data, cmd.name.clone(), &config, ctx_index),
         Commands::Rm(cmd) => del_task(data, cmd.name.clone(), &config, ctx_index),
         Commands::Rmc(cmd) => del_context(data, cmd.name.clone(), &config),
@@ -130,6 +132,49 @@ fn main() {
         Commands::Done(cmd) => mark_done(data, cmd.name.clone(), &config, ctx_index),
         Commands::Clear => clear_tasks(data, &config, ctx_index),
     }
+}
+
+fn edit_context(data: Vec<Context>, id: usize, name: String, config: &Config) {
+    let active_context = data.iter().find(|ctx| ctx.id == id);
+
+    match active_context {
+        Some(_) => {
+            let updated_data: Vec<Context> = data
+                .into_iter()
+                .map(|mut context| {
+                    if context.id != id {
+                        return context;
+                    }
+
+                    context.name = name.clone();
+                    return context;
+                })
+                .collect();
+
+            write_to_file(updated_data, &config)
+        }
+        None => {
+            println!("No context found with this ID: {}", id);
+        }
+    }
+}
+
+fn edit_task(mut data: Vec<Context>, id: usize, content: String, config: &Config, index: usize) {
+    let active_tasks = data[index].tasks.clone();
+
+    data[index].tasks = active_tasks
+        .into_iter()
+        .map(|mut task| {
+            if id == task.id {
+                task.name = content.clone();
+                return task;
+            }
+
+            task
+        })
+        .collect();
+
+    write_to_file(data, &config);
 }
 
 fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
@@ -155,6 +200,7 @@ fn use_context(mut data: Vec<Context>, name: String, config: &Config) {
 
     write_to_file(updated_data, config)
 }
+
 fn normalize_path(path: &String, starts_with_backslash: bool) -> String {
     if starts_with_backslash && !path.starts_with("/") {
         format!("/{path}")
@@ -343,7 +389,6 @@ fn del_task(mut data: Vec<Context>, args: String, config: &Config, index: usize)
 }
 
 fn list_tasks(data: Vec<Context>, index: usize, config: &Config, all: bool) {
-    println!("data: {:?}", data);
     if all {
         for ctx in &data {
             print_table(&ctx, &config);
