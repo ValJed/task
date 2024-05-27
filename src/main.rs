@@ -49,7 +49,7 @@ impl Context {
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(default)]
-struct Config {
+struct UserConfig {
     ssh_ip: String,
     ssh_username: String,
     ssh_file_path: String,
@@ -59,7 +59,35 @@ struct Config {
     api_key: String,
 }
 
-impl ::std::default::Default for Config {
+#[derive(Debug)]
+struct Config {
+    ssh_ip: String,
+    ssh_username: String,
+    ssh_file_path: String,
+    local_file_path: String,
+    max_line_lengh: usize,
+    api_url: String,
+    api_key: String,
+    folder_path: String,
+}
+
+impl Config {
+    fn new(config: UserConfig) -> Self {
+        let [file_path, folder_path] = get_file_paths(&config);
+        Self {
+            ssh_ip: config.ssh_ip,
+            ssh_username: config.ssh_username,
+            ssh_file_path: config.ssh_file_path,
+            local_file_path: file_path,
+            max_line_lengh: config.max_line_lengh,
+            api_url: config.api_url,
+            api_key: config.api_key,
+            folder_path: folder_path,
+        }
+    }
+}
+
+impl ::std::default::Default for UserConfig {
     fn default() -> Self {
         Self {
             ssh_ip: "".into(),
@@ -79,130 +107,159 @@ const LINE_LEN_FALLBACK: usize = 10;
 
 fn main() {
     let cli = Cli::parse();
-    let mut config: Config =
+    let user_config: UserConfig =
         confy::load("tasks", "config").expect("Error when loading the config file");
 
-    let mut cmd = Cli::command();
+    let mut cli_cmd = Cli::command();
     if let Some(generator) = cli.generator {
-        print_completions(generator, &mut cmd);
+        print_completions(generator, &mut cli_cmd);
         return;
     }
 
-    let [file_path, folder_path] = get_file_paths(&config);
-    config.local_file_path = file_path;
+    let config = Config::new(user_config);
 
+    if cli.command.is_none() {
+        list_tasks(&config, false);
+        return;
+    }
+
+    match &cli.command.unwrap() {
+        Commands::Use(cmd) => use_context(&config, cmd.name.clone()),
+        Commands::Up(cmd) => edit_task(&config, cmd.id.clone(), cmd.name.clone()),
+        Commands::Upc(cmd) => edit_context(&config, cmd.id.clone(), cmd.name.clone()),
+        Commands::Add(cmd) => add_task(&config, cmd.name.clone()),
+        Commands::Rm(cmd) => del_task(&config, cmd.name.clone()),
+        Commands::Rmc(cmd) => del_context(&config, cmd.name.clone()),
+        Commands::Ls => list_tasks(&config, false),
+        Commands::Lsa => list_tasks(&config, true),
+        Commands::Lsc => list_contexts(&config),
+        Commands::Done(cmd) => mark_done(&config, cmd.name.clone()),
+        Commands::Clear => clear_tasks(&config),
+        _ => (),
+    }
+}
+
+fn get_file_data(config: &Config) -> Result<(Vec<Context>, usize), &str> {
     let data_res = if config.ssh_ip.is_empty() {
         Ok(get_or_create_data_file(
             &config.local_file_path,
-            folder_path,
+            &config.folder_path,
         ))
     } else {
         get_or_create_data_file_ssh(&config)
     };
 
     if data_res.is_err() {
-        return;
+        return Err("Error when getting data from file");
     }
 
     let data = data_res.unwrap();
     let active_index = data.iter().position(|context| context.active == true);
 
-    if let Some(ref command) = cli.command {
-        if let Commands::Use(_) = command {
-            if active_index.is_none() {
-                println!("No current active context, let's create one using tasks use {{name}}");
-                return;
-            }
+    let cli = Cli::parse();
+    println!("cli.command: {:?}", cli.command);
+    match cli.command {
+        Some(Commands::Use(_)) => {
+            let ctx_index = active_index.unwrap();
+            Ok((data, ctx_index))
         }
-    }
+        _ => {
+            if active_index.is_none() {
+                return Err("No current active context, let's create one using tasks use {{name}}");
+            }
 
-    let ctx_index = active_index.unwrap();
-
-    if cli.command.is_none() {
-        list_tasks(data, ctx_index, &config, false);
-        return;
-    }
-
-    match &cli.command.unwrap() {
-        Commands::Use(cmd) => use_context(data, cmd.name.clone(), &config),
-        Commands::Up(cmd) => edit_task(data, cmd.id.clone(), cmd.name.clone(), &config, ctx_index),
-        Commands::Upc(cmd) => edit_context(data, cmd.id.clone(), cmd.name.clone(), &config),
-        Commands::Add(cmd) => add_task(data, cmd.name.clone(), &config, ctx_index),
-        Commands::Rm(cmd) => del_task(data, cmd.name.clone(), &config, ctx_index),
-        Commands::Rmc(cmd) => del_context(data, cmd.name.clone(), &config),
-        Commands::Ls => list_tasks(data, ctx_index, &config, false),
-        Commands::Lsa => list_tasks(data, ctx_index, &config, true),
-        Commands::Lsc => list_contexts(data),
-        Commands::Done(cmd) => mark_done(data, cmd.name.clone(), &config, ctx_index),
-        Commands::Clear => clear_tasks(data, &config, ctx_index),
+            let ctx_index = active_index.unwrap_or(0);
+            Ok((data, ctx_index))
+        }
     }
 }
 
-fn edit_context(data: Vec<Context>, id: usize, name: String, config: &Config) {
-    let active_context = data.iter().find(|ctx| ctx.id == id);
+fn edit_context(config: &Config, id: usize, name: String) {
+    match get_file_data(&config) {
+        Ok((data, _)) => {
+            let active_context = data.iter().find(|ctx| ctx.id == id);
 
-    match active_context {
-        Some(_) => {
-            let updated_data: Vec<Context> = data
+            match active_context {
+                Some(_) => {
+                    let updated_data: Vec<Context> = data
+                        .into_iter()
+                        .map(|mut context| {
+                            if context.id != id {
+                                return context;
+                            }
+
+                            context.name = name.clone();
+                            return context;
+                        })
+                        .collect();
+
+                    write_to_file(updated_data, &config)
+                }
+                None => {
+                    println!("No context found with this ID: {}", id);
+                }
+            }
+        }
+        Err(err) => {
+            println!(err);
+        }
+    }
+}
+
+fn edit_task(config: &Config, id: usize, content: String) {
+    match get_file_data(&config) {
+        Ok((mut data, index)) => {
+            let active_tasks = data[index].tasks.clone();
+
+            data[index].tasks = active_tasks
                 .into_iter()
-                .map(|mut context| {
-                    if context.id != id {
-                        return context;
+                .map(|mut task| {
+                    if id == task.id {
+                        task.name = content.clone();
+                        return task;
                     }
 
-                    context.name = name.clone();
-                    return context;
+                    task
                 })
                 .collect();
 
-            write_to_file(updated_data, &config)
+            write_to_file(data, &config);
         }
-        None => {
-            println!("No context found with this ID: {}", id);
+        Err(_) => {
+            println!("Error when getting data from file")
         }
     }
-}
-
-fn edit_task(mut data: Vec<Context>, id: usize, content: String, config: &Config, index: usize) {
-    let active_tasks = data[index].tasks.clone();
-
-    data[index].tasks = active_tasks
-        .into_iter()
-        .map(|mut task| {
-            if id == task.id {
-                task.name = content.clone();
-                return task;
-            }
-
-            task
-        })
-        .collect();
-
-    write_to_file(data, &config);
 }
 
 fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
     generate(gen, cmd, cmd.get_name().to_string(), &mut io::stdout());
 }
 
-fn use_context(mut data: Vec<Context>, name: String, config: &Config) {
-    let exists = data.iter().find(|ctx| ctx.name == name.to_owned());
+fn use_context(config: &Config, name: String) {
+    match get_file_data(&config) {
+        Ok((mut data, _)) => {
+            let exists = data.iter().find(|ctx| ctx.name == name.to_owned());
 
-    if exists.is_none() {
-        let new_context = Context::new(&name, data.len());
-        data.push(new_context);
+            if exists.is_none() {
+                let new_context = Context::new(&name, data.len());
+                data.push(new_context);
+            }
+
+            let updated_data = data
+                .into_iter()
+                .map(|mut ctx| {
+                    ctx.active = ctx.name == name.to_owned();
+
+                    ctx
+                })
+                .collect();
+
+            write_to_file(updated_data, config)
+        }
+        Err(_) => {
+            println!("Error when getting data from file");
+        }
     }
-
-    let updated_data = data
-        .into_iter()
-        .map(|mut ctx| {
-            ctx.active = ctx.name == name.to_owned();
-
-            ctx
-        })
-        .collect();
-
-    write_to_file(updated_data, config)
 }
 
 fn normalize_path(path: &String, starts_with_backslash: bool) -> String {
@@ -217,7 +274,7 @@ fn normalize_path(path: &String, starts_with_backslash: bool) -> String {
     }
 }
 
-fn get_file_paths(config: &Config) -> [String; 2] {
+fn get_file_paths(config: &UserConfig) -> [String; 2] {
     let folder_path = if config.ssh_ip.is_empty() {
         if config.local_file_path.is_empty() {
             let user = env::var("USER").expect("No user set on this machine");
@@ -298,7 +355,7 @@ fn get_or_create_data_file_ssh(config: &Config) -> Result<Vec<Context>, ()> {
     }
 }
 
-fn get_or_create_data_file(file: &String, folder: String) -> Vec<Context> {
+fn get_or_create_data_file(file: &String, folder: &String) -> Vec<Context> {
     let folder_path = Path::new(folder.as_str());
     let file_path = Path::new(file.as_str());
 
@@ -322,20 +379,27 @@ fn get_or_create_data_file(file: &String, folder: String) -> Vec<Context> {
     contexts
 }
 
-fn add_task(mut data: Vec<Context>, task: String, config: &Config, index: usize) {
-    let date = Local::now();
+fn add_task(config: &Config, task: String) {
+    match get_file_data(&config) {
+        Ok((mut data, index)) => {
+            let date = Local::now();
 
-    let task: Task = Task {
-        id: data[index].tasks.len() + 1,
-        name: task,
-        done: false,
-        creation_date: date.to_string(),
-        modification_date: date.to_string(),
-    };
+            let task: Task = Task {
+                id: data[index].tasks.len() + 1,
+                name: task,
+                done: false,
+                creation_date: date.to_string(),
+                modification_date: date.to_string(),
+            };
 
-    data[index].tasks.push(task);
+            data[index].tasks.push(task);
 
-    write_to_file(data, &config);
+            write_to_file(data, &config);
+        }
+        Err(_) => {
+            println!("Error when getting data from file");
+        }
+    }
 }
 
 fn write_to_file(data: Vec<Context>, config: &Config) {
@@ -369,36 +433,50 @@ fn write_to_file(data: Vec<Context>, config: &Config) {
     file.close().unwrap();
 }
 
-fn del_task(mut data: Vec<Context>, args: String, config: &Config, index: usize) {
-    let ids = parse_ids(parse_args(&args));
-    let mut counter = 0;
+fn del_task(config: &Config, args: String) {
+    match get_file_data(&config) {
+        Ok((mut data, index)) => {
+            let ids = parse_ids(parse_args(&args));
+            let mut counter = 0;
 
-    let active_tasks = data[index].tasks.clone();
+            let active_tasks = data[index].tasks.clone();
 
-    data[index].tasks = active_tasks
-        .into_iter()
-        .filter_map(|mut task| {
-            if ids.contains(&task.id) {
-                return None;
-            }
+            data[index].tasks = active_tasks
+                .into_iter()
+                .filter_map(|mut task| {
+                    if ids.contains(&task.id) {
+                        return None;
+                    }
 
-            counter += 1;
-            task.id = counter;
+                    counter += 1;
+                    task.id = counter;
 
-            Some(task)
-        })
-        .collect();
+                    Some(task)
+                })
+                .collect();
 
-    write_to_file(data, &config);
+            write_to_file(data, &config);
+        }
+        Err(_) => {
+            println!("Error when getting data from file");
+        }
+    }
 }
 
-fn list_tasks(data: Vec<Context>, index: usize, config: &Config, all: bool) {
-    if all {
-        for ctx in &data {
-            print_table(&ctx, &config);
+fn list_tasks(config: &Config, all: bool) {
+    match get_file_data(&config) {
+        Ok((data, index)) => {
+            if all {
+                for ctx in &data {
+                    print_table(&ctx, &config);
+                }
+            } else {
+                print_table(&data[index], &config);
+            }
         }
-    } else {
-        print_table(&data[index], &config);
+        Err(_) => {
+            println!("Error when getting data from file");
+        }
     }
 }
 
@@ -472,80 +550,107 @@ fn break_line(line: String, max_line_length: &usize) -> String {
     formatted
 }
 
-fn mark_done(mut data: Vec<Context>, args: String, config: &Config, index: usize) {
-    let ids = parse_ids(parse_args(&args));
+fn mark_done(config: &Config, args: String) {
+    match get_file_data(&config) {
+        Ok((mut data, index)) => {
+            let ids = parse_ids(parse_args(&args));
 
-    data[index].tasks = data[index]
-        .tasks
-        .iter()
-        .map(|task| {
-            let mut cloned = task.clone();
-            if ids.contains(&cloned.id) {
-                cloned.done = true
+            data[index].tasks = data[index]
+                .tasks
+                .iter()
+                .map(|task| {
+                    let mut cloned = task.clone();
+                    if ids.contains(&cloned.id) {
+                        cloned.done = true
+                    }
+
+                    cloned.to_owned()
+                })
+                .collect();
+
+            write_to_file(data, &config);
+        }
+        Err(_) => {
+            println!("Error when getting data from file");
+        }
+    }
+}
+
+fn clear_tasks(config: &Config) {
+    match get_file_data(&config) {
+        Ok((mut data, index)) => {
+            data[index].tasks = vec![];
+            write_to_file(data, &config)
+        }
+        Err(_) => {
+            println!("Error when getting data from file")
+        }
+    }
+}
+
+fn del_context(config: &Config, args: String) {
+    match get_file_data(&config) {
+        Ok((data, _)) => {
+            let ctx_names_or_ids = parse_args(&args);
+
+            let mut updated_data: Vec<Context> = data
+                .into_iter()
+                .enumerate()
+                .filter(|(index, ctx)| {
+                    let id = (index + 1).to_string();
+                    if ctx_names_or_ids.contains(&ctx.name.as_str())
+                        || ctx_names_or_ids.contains(&id.as_str())
+                    {
+                        return false;
+                    }
+
+                    true
+                })
+                .map(|(_, ctx)| ctx)
+                .collect();
+
+            let active_ctx = updated_data.iter().find(|ctx| ctx.active);
+
+            if active_ctx.is_none() && !updated_data.get(0).is_none() {
+                updated_data[0].active = true;
             }
 
-            cloned.to_owned()
-        })
-        .collect();
-
-    write_to_file(data, &config);
+            write_to_file(updated_data, &config);
+        }
+        Err(_) => {
+            println!("Error when getting data from file");
+        }
+    }
 }
 
-fn clear_tasks(mut data: Vec<Context>, config: &Config, index: usize) {
-    data[index].tasks = vec![];
+fn list_contexts(config: &Config) {
+    match get_file_data(&config) {
+        Ok((data, _)) => {
+            let mut table = Table::new();
+            table
+                .load_preset(UTF8_FULL)
+                .apply_modifier(UTF8_ROUND_CORNERS);
 
-    write_to_file(data, &config)
-}
-
-fn del_context(data: Vec<Context>, args: String, config: &Config) {
-    let ctx_names_or_ids = parse_args(&args);
-
-    let mut updated_data: Vec<Context> = data
-        .into_iter()
-        .enumerate()
-        .filter(|(index, ctx)| {
-            let id = (index + 1).to_string();
-            if ctx_names_or_ids.contains(&ctx.name.as_str())
-                || ctx_names_or_ids.contains(&id.as_str())
-            {
-                return false;
+            for (i, ctx) in data.iter().enumerate() {
+                let active = if ctx.active { "active" } else { "" };
+                table.add_row(vec![
+                    (i + 1).to_string(),
+                    ctx.name.to_owned(),
+                    format!("{} tasks", ctx.tasks.len()),
+                    active.to_string(),
+                ]);
             }
 
-            true
-        })
-        .map(|(_, ctx)| ctx)
-        .collect();
+            if data.len() == 0 {
+                table.add_row(vec!["Add your first context using: tasks use {{context}}"]);
+            }
 
-    let active_ctx = updated_data.iter().find(|ctx| ctx.active);
-
-    if active_ctx.is_none() && !updated_data.get(0).is_none() {
-        updated_data[0].active = true;
+            println!("{table}");
+        }
+        Err(_) => {
+            println!("Error when getting data from file");
+        }
     }
-
-    write_to_file(updated_data, &config);
-}
-
-fn list_contexts(data: Vec<Context>) {
-    let mut table = Table::new();
-    table
-        .load_preset(UTF8_FULL)
-        .apply_modifier(UTF8_ROUND_CORNERS);
-
-    for (i, ctx) in data.iter().enumerate() {
-        let active = if ctx.active { "active" } else { "" };
-        table.add_row(vec![
-            (i + 1).to_string(),
-            ctx.name.to_owned(),
-            format!("{} tasks", ctx.tasks.len()),
-            active.to_string(),
-        ]);
-    }
-
-    if data.len() == 0 {
-        table.add_row(vec!["Add your first context using: tasks use {{context}}"]);
-    }
-
-    println!("{table}");
 }
 
 fn parse_args(args: &String) -> Vec<&str> {
