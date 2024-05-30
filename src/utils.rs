@@ -75,16 +75,16 @@ pub fn print_table(config: &Config, ctx: &Context) {
     println!("{table}");
 }
 
-pub fn get_or_create_data_file<'a>(
+pub fn get_or_create_data_file(
     file: &String,
     folder: &String,
     create_file: bool,
-) -> Result<Vec<Context>, &'a str> {
+) -> Result<Vec<Context>, String> {
     let folder_path = Path::new(folder.as_str());
     let file_path = Path::new(file.as_str());
 
-    if !folder_path.exists() || !file_path.is_file() {
-        return Err("No data file found: {{file_path}}");
+    if !create_file && (!folder_path.exists() || !file_path.is_file()) {
+        return Err(format!("No data file found: {file}"));
     }
 
     if !folder_path.exists() {
@@ -110,10 +110,10 @@ pub fn get_or_create_data_file<'a>(
 pub fn get_or_create_data_file_ssh(
     config: &Config,
     create_file: bool,
-) -> Result<Vec<Context>, &str> {
+) -> Result<Vec<Context>, String> {
     let sftp_res = get_sftp(&config);
     if sftp_res.is_err() {
-        return Err("Error when getting SFTP connection");
+        return Err(String::from("Error when getting SFTP connection"));
     };
 
     let sftp = sftp_res.unwrap();
@@ -130,8 +130,9 @@ pub fn get_or_create_data_file_ssh(
             Ok(contexts)
         }
         Err(_) => {
+            let ip = &config.ssh_ip;
             if !create_file {
-                return Err("No file found on remote server: {{config.ssh_ip}} -> {{path_str}}");
+                return Err(format!("No file found on remote server: {ip}:{path_str}"));
             }
 
             let mut file = sftp.create(path).expect("Error when creating file");

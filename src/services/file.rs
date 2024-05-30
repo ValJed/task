@@ -65,8 +65,8 @@ pub fn edit_task(config: &Config, id: usize, content: String) {
 
             write_to_file(data, &config);
         }
-        Err(_) => {
-            println!("Error when getting data from file")
+        Err(err) => {
+            println!("{}", err);
         }
     }
 }
@@ -92,8 +92,8 @@ pub fn use_context(config: &Config, name: String) {
 
             write_to_file(updated_data, config)
         }
-        Err(_) => {
-            println!("Error when getting data from file");
+        Err(err) => {
+            println!("{}", err);
         }
     }
 }
@@ -115,8 +115,8 @@ pub fn add_task(config: &Config, task: String) {
 
             write_to_file(data, &config);
         }
-        Err(_) => {
-            println!("Error when getting data from file");
+        Err(err) => {
+            println!("{}", err);
         }
     }
 }
@@ -145,8 +145,8 @@ pub fn del_task(config: &Config, args: String) {
 
             write_to_file(data, &config);
         }
-        Err(_) => {
-            println!("Error when getting data from file");
+        Err(err) => {
+            println!("{}", err);
         }
     }
 }
@@ -162,8 +162,8 @@ pub fn list_tasks(config: &Config, all: bool) {
                 print_table(&config, &data[index]);
             }
         }
-        Err(_) => {
-            println!("Error when getting data from file");
+        Err(err) => {
+            println!("{}", err);
         }
     }
 }
@@ -188,8 +188,8 @@ pub fn mark_done(config: &Config, args: String) {
 
             write_to_file(data, &config);
         }
-        Err(_) => {
-            println!("Error when getting data from file");
+        Err(err) => {
+            println!("{}", err);
         }
     }
 }
@@ -200,8 +200,8 @@ pub fn clear_tasks(config: &Config) {
             data[index].tasks = vec![];
             write_to_file(data, &config)
         }
-        Err(_) => {
-            println!("Error when getting data from file")
+        Err(err) => {
+            println!("{}", err);
         }
     }
 }
@@ -235,8 +235,8 @@ pub fn del_context(config: &Config, args: String) {
 
             write_to_file(updated_data, &config);
         }
-        Err(_) => {
-            println!("Error when getting data from file");
+        Err(err) => {
+            println!("{}", err);
         }
     }
 }
@@ -265,13 +265,13 @@ pub fn list_contexts(config: &Config) {
 
             println!("{table}");
         }
-        Err(_) => {
-            println!("Error when getting data from file");
+        Err(err) => {
+            println!("{}", err);
         }
     }
 }
 
-fn get_file_data(config: &Config) -> Result<(Vec<Context>, usize), &str> {
+fn get_file_data(config: &Config) -> Result<(Vec<Context>, usize), String> {
     let data_res = if config.ssh_ip.is_empty() {
         get_or_create_data_file(&config.local_file_path, &config.folder_path, true)
     } else {
@@ -293,7 +293,9 @@ fn get_file_data(config: &Config) -> Result<(Vec<Context>, usize), &str> {
         }
         _ => {
             if active_index.is_none() {
-                return Err("No current active context, let's create one using task use {{name}}");
+                return Err(format!(
+                    "No current active context, let's create one using task use {{name}}"
+                ));
             }
 
             let ctx_index = active_index.unwrap_or(0);
