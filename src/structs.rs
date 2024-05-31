@@ -23,6 +23,26 @@ pub struct Context {
     pub active: bool,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ContextOnly {
+    pub id: usize,
+    pub name: String,
+    pub active: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ContextRequest {
+    pub name: String,
+    pub active: bool,
+    pub simple_create: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TaskRequest {
+    pub content: String,
+    pub context_id: i32,
+}
+
 impl Context {
     pub fn new(name: &String, size: usize) -> Self {
         Self {
