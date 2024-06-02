@@ -106,6 +106,19 @@ impl ::std::default::Default for UserConfig {
     }
 }
 
+pub trait Service {
+    fn list_tasks(&self, config: &Config, all: bool);
+    fn list_contexts(&self, config: &Config);
+    fn add_task(&self, config: &Config, name: String);
+    fn del_task(&self, config: &Config, name: String);
+    fn del_context(&self, config: &Config, name: String);
+    fn edit_task(&self, config: &Config, id: usize, name: String);
+    fn edit_context(&self, config: &Config, id: usize, name: String);
+    fn use_context(&self, config: &Config, name: String);
+    fn mark_done(&self, config: &Config, name: String);
+    fn clear_tasks(&self, config: &Config);
+}
+
 pub fn normalize_path(path: &String, starts_with_backslash: bool) -> String {
     if starts_with_backslash && !path.starts_with("/") {
         format!("/{path}")

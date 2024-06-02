@@ -8,10 +8,11 @@ mod services;
 mod structs;
 mod utils;
 
-use structs::{Config, UserConfig};
+use structs::{Config, Service, UserConfig};
 
-use services::api as api_service;
-use services::file as file_service;
+use services::api;
+use services::api::migrate;
+use services::file;
 
 use args::{Cli, Commands};
 use clap::Parser;
@@ -29,25 +30,32 @@ fn main() {
 
     let config = Config::new(user_config);
 
-    // if cli.command.is_none() {
-    //     list_tasks(&config, false);
-    //     return;
-    // }
+    if config.api_url.is_empty() {
+        run_cmd(&config, cli, &api::ApiService);
+    } else {
+        run_cmd(&config, cli, &file::FileService);
+    }
+}
+
+fn run_cmd(config: &Config, cli: Cli, data_service: &impl Service) {
+    if let None = cli.command {
+        data_service.list_tasks(&config, false);
+        return;
+    }
 
     match &cli.command.unwrap() {
-        Commands::Use(cmd) => file_service::use_context(&config, cmd.name.clone()),
-        Commands::Up(cmd) => file_service::edit_task(&config, cmd.id.clone(), cmd.name.clone()),
-        Commands::Upc(cmd) => file_service::edit_context(&config, cmd.id.clone(), cmd.name.clone()),
-        Commands::Add(cmd) => file_service::add_task(&config, cmd.name.clone()),
-        Commands::Rm(cmd) => file_service::del_task(&config, cmd.name.clone()),
-        Commands::Rmc(cmd) => file_service::del_context(&config, cmd.name.clone()),
-        Commands::Ls => file_service::list_tasks(&config, false),
-        Commands::Lsa => file_service::list_tasks(&config, true),
-        Commands::Lsc => file_service::list_contexts(&config),
-        Commands::Done(cmd) => file_service::mark_done(&config, cmd.name.clone()),
-        Commands::Clear => file_service::clear_tasks(&config),
-        Commands::Migrate => api_service::migrate(&config),
-        _ => (),
+        Commands::Use(cmd) => data_service.use_context(&config, cmd.name.clone()),
+        Commands::Up(cmd) => data_service.edit_task(&config, cmd.id.clone(), cmd.name.clone()),
+        Commands::Upc(cmd) => data_service.edit_context(&config, cmd.id.clone(), cmd.name.clone()),
+        Commands::Add(cmd) => data_service.add_task(&config, cmd.name.clone()),
+        Commands::Rm(cmd) => data_service.del_task(&config, cmd.name.clone()),
+        Commands::Rmc(cmd) => data_service.del_context(&config, cmd.name.clone()),
+        Commands::Ls => data_service.list_tasks(&config, false),
+        Commands::Lsa => data_service.list_tasks(&config, true),
+        Commands::Lsc => data_service.list_contexts(&config),
+        Commands::Done(cmd) => data_service.mark_done(&config, cmd.name.clone()),
+        Commands::Clear => data_service.clear_tasks(&config),
+        Commands::Migrate => migrate(&config),
     }
 }
 

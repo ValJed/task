@@ -1,38 +1,46 @@
-use std::fmt::write;
-
 #[allow(dead_code, unused_variables)]
-use crate::structs::{Config, Context, ContextOnly, ContextRequest, Task, TaskRequest};
+use crate::structs::{Config, Context, ContextOnly, ContextRequest, Service, TaskRequest};
 use crate::utils::{get_or_create_data_file, get_or_create_data_file_ssh};
-use reqwest::blocking::{Client, RequestBuilder};
-use reqwest::{header, Error as ReqwestErr, Method};
+use reqwest::blocking::Client;
+use reqwest::{header, Error as ReqwestErr};
 
-// pub fn migate() {
-//    // Migrate from File to API or from API to file
-// }
+#[derive(Debug)]
+pub struct ApiService;
 
-// pub fn use_context(config: &Config, name: String) {
-//     let res = request(config, "context", Method::POST);
-// }
+impl Service for ApiService {
+    fn use_context(&self, config: &Config, name: String) {}
 
-pub fn add_task(config: &Config, name: String) {}
+    fn add_task(&self, config: &Config, name: String) {}
 
-pub fn edit_context(config: &Config, id: usize, name: String) {}
+    fn edit_context(&self, config: &Config, id: usize, name: String) {}
 
-pub fn edit_task(config: &Config, id: usize, name: String) {}
+    fn edit_task(&self, config: &Config, id: usize, name: String) {}
 
-pub fn del_context(config: &Config, name: String) {}
+    fn del_context(&self, config: &Config, name: String) {}
 
-pub fn del_task(config: &Config, name: String) {}
+    fn del_task(&self, config: &Config, name: String) {}
 
-pub fn list_task(config: &Config, all: bool) {
-    // let res = request(config, "task", Method::GET);
+    fn list_tasks(&self, config: &Config, all: bool) {
+        // let res = request(config, "task", Method::GET);
+    }
+
+    fn list_contexts(&self, config: &Config) {
+        let client = get_client(&config).expect("Error when creating http client");
+
+        let contexts: Vec<ContextOnly> = client
+            .get(get_url(&config, "context"))
+            .send()
+            .expect("Error when fetching contexts")
+            .json()
+            .expect("Error when parsing response");
+
+        println!("contexts: {:?}", contexts);
+    }
+
+    fn mark_done(&self, config: &Config, name: String) {}
+
+    fn clear_tasks(&self, config: &Config) {}
 }
-
-pub fn list_contexts(config: &Config, all: bool) {}
-
-pub fn mark_done(config: &Config, name: String) {}
-
-pub fn clear_tasks(config: &Config, name: String) {}
 
 pub fn migrate(config: &Config) {
     let data_res = get_file_data(config);
