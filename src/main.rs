@@ -8,11 +8,10 @@ mod services;
 mod structs;
 mod utils;
 
-use structs::{Config, Service, UserConfig};
-
-use services::api;
 use services::api::migrate;
-use services::file;
+use services::api::ApiService;
+use services::file::FileService;
+use structs::{Config, Service, UserConfig};
 
 use args::{Cli, Commands};
 use clap::Parser;
@@ -31,9 +30,9 @@ fn main() {
     let config = Config::new(user_config);
 
     if config.api_url.is_empty() {
-        run_cmd(&config, cli, &api::ApiService);
+        run_cmd(&config, cli, &FileService);
     } else {
-        run_cmd(&config, cli, &file::FileService);
+        run_cmd(&config, cli, &ApiService);
     }
 }
 

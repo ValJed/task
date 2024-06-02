@@ -1,6 +1,11 @@
+use crate::structs::{
+    Config, Context, ContextCountTask, ContextOnly, ContextRequest, Service, Task, TaskRequest,
+};
+use crate::utils::{get_or_create_data_file, get_or_create_data_file_ssh, print_tasks};
 #[allow(dead_code, unused_variables)]
-use crate::structs::{Config, Context, ContextOnly, ContextRequest, Service, TaskRequest};
-use crate::utils::{get_or_create_data_file, get_or_create_data_file_ssh};
+use comfy_table::modifiers::UTF8_ROUND_CORNERS;
+use comfy_table::presets::UTF8_FULL;
+use comfy_table::Table;
 use reqwest::blocking::Client;
 use reqwest::{header, Error as ReqwestErr};
 
@@ -21,20 +26,52 @@ impl Service for ApiService {
     fn del_task(&self, config: &Config, name: String) {}
 
     fn list_tasks(&self, config: &Config, all: bool) {
-        // let res = request(config, "task", Method::GET);
-    }
-
-    fn list_contexts(&self, config: &Config) {
         let client = get_client(&config).expect("Error when creating http client");
 
-        let contexts: Vec<ContextOnly> = client
-            .get(get_url(&config, "context"))
+        let slug = if all { "task" } else { "task?active=true" };
+
+        let data: Vec<Context> = client
+            .get(get_url(&config, slug))
             .send()
             .expect("Error when fetching contexts")
             .json()
             .expect("Error when parsing response");
 
-        println!("contexts: {:?}", contexts);
+        for ctx in &data {
+            print_tasks(&config, &ctx);
+        }
+    }
+
+    fn list_contexts(&self, config: &Config) {
+        let client = get_client(&config).expect("Error when creating http client");
+
+        let data: Vec<ContextCountTask> = client
+            .get(get_url(&config, "context?count=true"))
+            .send()
+            .expect("Error when fetching contexts")
+            .json()
+            .expect("Error when parsing response");
+
+        let mut table = Table::new();
+        table
+            .load_preset(UTF8_FULL)
+            .apply_modifier(UTF8_ROUND_CORNERS);
+
+        for (i, ctx) in data.iter().enumerate() {
+            let active = if ctx.active { "active" } else { "" };
+            table.add_row(vec![
+                (i + 1).to_string(),
+                ctx.name.to_owned(),
+                format!("{} tasks", ctx.task_count),
+                active.to_string(),
+            ]);
+        }
+
+        if data.len() == 0 {
+            table.add_row(vec!["Add your first context using: tasks use {{context}}"]);
+        }
+
+        println!("{table}");
     }
 
     fn mark_done(&self, config: &Config, name: String) {}
@@ -78,8 +115,10 @@ pub fn migrate(config: &Config) {
             .tasks
             .iter()
             .map(|task| TaskRequest {
-                content: task.name.clone(),
+                content: task.content.clone(),
                 context_id: created_ctx.id as i32,
+                creation_date: task.creation_date.clone(),
+                modification_date: task.modification_date.clone(),
             })
             .collect();
 

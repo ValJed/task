@@ -9,7 +9,7 @@ const LINE_LEN_FALLBACK: usize = 10;
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Task {
     pub id: usize,
-    pub name: String,
+    pub content: String,
     pub done: bool,
     pub creation_date: String,
     pub modification_date: String,
@@ -19,7 +19,32 @@ pub struct Task {
 pub struct Context {
     pub id: usize,
     pub name: String,
+    pub active: bool,
     pub tasks: Vec<Task>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CContext {
+    pub id: i32,
+    pub name: String,
+    pub active: bool,
+    pub tasks: Vec<TTask>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TTask {
+    pub id: i32,
+    pub name: String,
+    pub done: bool,
+    pub creation_date: String,
+    pub modification_date: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ContextCountTask {
+    pub id: usize,
+    pub name: String,
+    pub task_count: u64,
     pub active: bool,
 }
 
@@ -41,6 +66,8 @@ pub struct ContextRequest {
 pub struct TaskRequest {
     pub content: String,
     pub context_id: i32,
+    pub creation_date: String,
+    pub modification_date: String,
 }
 
 impl Context {

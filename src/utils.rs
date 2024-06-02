@@ -32,7 +32,7 @@ pub fn parse_ids(ids: Vec<&str>) -> Vec<usize> {
         .collect()
 }
 
-pub fn print_table(config: &Config, ctx: &Context) {
+pub fn print_tasks(config: &Config, ctx: &Context) {
     let mut table = Table::new();
 
     table
@@ -52,7 +52,7 @@ pub fn print_table(config: &Config, ctx: &Context) {
             "[]".to_string()
         };
 
-        let splitted_line = break_line(task.name.to_owned(), &config.max_line_lengh);
+        let splitted_line = break_line(task.content.to_owned(), &config.max_line_lengh);
 
         table.add_row(vec![
             Cell::new(task.id.to_owned()),

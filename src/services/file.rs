@@ -11,7 +11,7 @@ use std::path::Path;
 use crate::structs::{Config, Context, Service, Task};
 use crate::utils::{
     get_or_create_data_file, get_or_create_data_file_ssh, get_remote_path, get_sftp, parse_args,
-    parse_ids, print_table,
+    parse_ids, print_tasks,
 };
 
 #[derive(Debug)]
@@ -59,7 +59,7 @@ impl Service for FileService {
                     .into_iter()
                     .map(|mut task| {
                         if id == task.id {
-                            task.name = content.clone();
+                            task.content = content.clone();
                             return task;
                         }
 
@@ -109,7 +109,7 @@ impl Service for FileService {
 
                 let task: Task = Task {
                     id: data[index].tasks.len() + 1,
-                    name: task,
+                    content: task,
                     done: false,
                     creation_date: date.to_string(),
                     modification_date: date.to_string(),
@@ -160,10 +160,10 @@ impl Service for FileService {
             Ok((data, index)) => {
                 if all {
                     for ctx in &data {
-                        print_table(&config, &ctx);
+                        print_tasks(&config, &ctx);
                     }
                 } else {
-                    print_table(&config, &data[index]);
+                    print_tasks(&config, &data[index]);
                 }
             }
             Err(err) => {
