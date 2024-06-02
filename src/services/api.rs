@@ -1,5 +1,6 @@
 use crate::structs::{
     Config, Context, ContextCountTask, ContextOnly, ContextRequest, Service, Task, TaskRequest,
+    TaskRequestFull,
 };
 use crate::utils::{get_or_create_data_file, get_or_create_data_file_ssh, print_tasks};
 #[allow(dead_code, unused_variables)]
@@ -13,9 +14,40 @@ use reqwest::{header, Error as ReqwestErr};
 pub struct ApiService;
 
 impl Service for ApiService {
-    fn use_context(&self, config: &Config, name: String) {}
+    fn use_context(&self, config: &Config, name: String) {
+        let client = get_client(&config).expect("Error when creating http client");
+        let body = ContextRequest {
+            name,
+            active: false,
+            simple_create: false,
+        };
 
-    fn add_task(&self, config: &Config, name: String) {}
+        let data: Context = client
+            .post(get_url(&config, "context"))
+            .json(&body)
+            .send()
+            .expect("Error when creating context")
+            .json()
+            .expect("Error when parsing response");
+
+        print_tasks(&config, &data);
+    }
+
+    fn add_task(&self, config: &Config, content: String) {
+        let client = get_client(&config).expect("Error when creating http client");
+        let body = TaskRequest { content };
+
+        let data: Task = client
+            .post(get_url(&config, "task"))
+            .json(&body)
+            .send()
+            .expect("Error when creating context")
+            .json()
+            .expect("Error when parsing response");
+        println!("data: {:?}", data);
+
+        // print_tasks(&config, &data);
+    }
 
     fn edit_context(&self, config: &Config, id: usize, name: String) {}
 
@@ -111,10 +143,10 @@ pub fn migrate(config: &Config) {
             .json::<ContextOnly>()
             .expect("Error when parsing response");
 
-        let tasks: Vec<TaskRequest> = context
+        let tasks: Vec<TaskRequestFull> = context
             .tasks
             .iter()
-            .map(|task| TaskRequest {
+            .map(|task| TaskRequestFull {
                 content: task.content.clone(),
                 context_id: created_ctx.id as i32,
                 creation_date: task.creation_date.clone(),

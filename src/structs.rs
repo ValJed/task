@@ -24,23 +24,6 @@ pub struct Context {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct CContext {
-    pub id: i32,
-    pub name: String,
-    pub active: bool,
-    pub tasks: Vec<TTask>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct TTask {
-    pub id: i32,
-    pub name: String,
-    pub done: bool,
-    pub creation_date: String,
-    pub modification_date: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ContextCountTask {
     pub id: usize,
     pub name: String,
@@ -64,6 +47,11 @@ pub struct ContextRequest {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TaskRequest {
+    pub content: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TaskRequestFull {
     pub content: String,
     pub context_id: i32,
     pub creation_date: String,
