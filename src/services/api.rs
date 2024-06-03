@@ -30,23 +30,24 @@ impl Service for ApiService {
             .json()
             .expect("Error when parsing response");
 
-        print_tasks(&config, &data);
+        let updated = mutate_tasks_ids(vec![data]);
+
+        print_tasks(&config, &updated[0]);
     }
 
     fn add_task(&self, config: &Config, content: String) {
         let client = get_client(&config).expect("Error when creating http client");
         let body = TaskRequest { content };
 
-        let data: Task = client
+        let _data: Task = client
             .post(get_url(&config, "task"))
             .json(&body)
             .send()
             .expect("Error when creating context")
             .json()
             .expect("Error when parsing response");
-        println!("data: {:?}", data);
 
-        // print_tasks(&config, &data);
+        println!("Task created");
     }
 
     fn edit_context(&self, config: &Config, id: usize, name: String) {}
@@ -55,7 +56,18 @@ impl Service for ApiService {
 
     fn del_context(&self, config: &Config, name: String) {}
 
-    fn del_task(&self, config: &Config, name: String) {}
+    fn del_task(&self, config: &Config, id: String) {
+        let client = get_client(&config).expect("Error when creating http client");
+
+        let data: Task = client
+            .delete(get_url(&config, &format!("task/{}?index=true", id)))
+            .send()
+            .expect("Error when fetching contexts")
+            .json()
+            .expect("Error when parsing response");
+
+        println!("Task deleted");
+    }
 
     fn list_tasks(&self, config: &Config, all: bool) {
         let client = get_client(&config).expect("Error when creating http client");
@@ -69,7 +81,9 @@ impl Service for ApiService {
             .json()
             .expect("Error when parsing response");
 
-        for ctx in &data {
+        let updated = mutate_tasks_ids(data);
+
+        for ctx in &updated {
             print_tasks(&config, &ctx);
         }
     }
@@ -115,7 +129,6 @@ pub fn migrate(config: &Config) {
     let data_res = get_file_data(config);
 
     if data_res.is_err() {
-        println!("{}", data_res.unwrap_err());
         return;
     }
     let data = data_res.unwrap();
@@ -189,4 +202,24 @@ fn get_file_data(config: &Config) -> Result<Vec<Context>, String> {
     };
 
     data_res
+}
+
+fn mutate_tasks_ids(contexts: Vec<Context>) -> Vec<Context> {
+    let mut counter = 0;
+    contexts
+        .into_iter()
+        .map(|mut context| {
+            context.tasks = context
+                .tasks
+                .into_iter()
+                .map(|mut task| {
+                    counter += 1;
+                    task.id = counter;
+                    task
+                })
+                .collect();
+
+            context
+        })
+        .collect()
 }
