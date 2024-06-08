@@ -46,6 +46,11 @@ pub struct ContextRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct ContextUpdateRequest {
+    pub name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TaskRequest {
     pub content: String,
 }

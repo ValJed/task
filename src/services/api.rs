@@ -1,13 +1,13 @@
 use crate::structs::{
-    Config, Context, ContextCountTask, ContextOnly, ContextRequest, Service, Task, TaskRequest,
-    TaskRequestFull,
+    Config, Context, ContextCountTask, ContextOnly, ContextRequest, ContextUpdateRequest, Service,
+    Task, TaskRequest, TaskRequestFull,
 };
 use crate::utils::{get_or_create_data_file, get_or_create_data_file_ssh, print_tasks};
 #[allow(dead_code, unused_variables)]
 use comfy_table::modifiers::UTF8_ROUND_CORNERS;
 use comfy_table::presets::UTF8_FULL;
 use comfy_table::Table;
-use reqwest::blocking::Client;
+use reqwest::blocking::{Client, Response};
 use reqwest::{header, Error as ReqwestErr};
 
 #[derive(Debug)]
@@ -37,11 +37,10 @@ impl Service for ApiService {
 
     fn add_task(&self, config: &Config, content: String) {
         let client = get_client(&config).expect("Error when creating http client");
-        let body = TaskRequest { content };
 
         let _data: Task = client
             .post(get_url(&config, "task"))
-            .json(&body)
+            .json(&TaskRequest { content })
             .send()
             .expect("Error when creating context")
             .json()
@@ -50,16 +49,46 @@ impl Service for ApiService {
         println!("Task created");
     }
 
-    fn edit_context(&self, config: &Config, id: usize, name: String) {}
+    fn edit_context(&self, config: &Config, index: usize, name: String) {
+        let client = get_client(&config).expect("Error when creating http client");
 
-    fn edit_task(&self, config: &Config, id: usize, name: String) {}
+        let res: Response = client
+            .put(get_url(&config, &format!("context/index/{}", index)))
+            .json(&ContextUpdateRequest { name: name.clone() })
+            .send()
+            .expect("Error when fetching contexts");
+
+        if res.status().is_success() {
+            println!("Context updated with name: {}", name);
+        } else {
+            println!("Error when updating context, status: {}", res.status());
+        }
+    }
+
+    fn edit_task(&self, config: &Config, id: usize, content: String) {
+        let client = get_client(&config).expect("Error when creating http client");
+
+        let res: Response = client
+            .put(get_url(&config, &format!("task/{}?index=true", id)))
+            .json(&TaskRequest {
+                content: content.clone(),
+            })
+            .send()
+            .expect("Error when fetching contexts");
+
+        if res.status().is_success() {
+            println!("Task updated with content: {}", content);
+        } else {
+            println!("Error when updating task, status: {}", res.status());
+        }
+    }
 
     fn del_context(&self, config: &Config, name: String) {}
 
     fn del_task(&self, config: &Config, id: String) {
         let client = get_client(&config).expect("Error when creating http client");
 
-        let data: Task = client
+        let _data: Task = client
             .delete(get_url(&config, &format!("task/{}?index=true", id)))
             .send()
             .expect("Error when fetching contexts")
