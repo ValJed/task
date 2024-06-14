@@ -56,6 +56,11 @@ pub struct TaskRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct TaskDoneRequest {
+    pub done: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TaskRequestFull {
     pub content: String,
     pub context_id: i32,

@@ -1,6 +1,6 @@
 use crate::structs::{
     Config, Context, ContextCountTask, ContextOnly, ContextRequest, ContextUpdateRequest, Service,
-    Task, TaskRequest, TaskRequestFull,
+    Task, TaskDoneRequest, TaskRequest, TaskRequestFull,
 };
 use crate::utils::{get_or_create_data_file, get_or_create_data_file_ssh, print_tasks};
 #[allow(dead_code, unused_variables)]
@@ -162,7 +162,20 @@ impl Service for ApiService {
         println!("{table}");
     }
 
-    fn mark_done(&self, config: &Config, name: String) {}
+    fn mark_done(&self, config: &Config, index: String) {
+        let client = get_client(&config).expect("Error when creating http client");
+
+        let res = client
+            .put(get_url(&config, &format!("task/done/{}?index=true", index)))
+            .send()
+            .expect("Error when fetching contexts");
+
+        if res.status().is_success() {
+            println!("Task marked as done");
+        } else {
+            println!("Error when marking task as done, status: {}", res.status());
+        }
+    }
 
     fn clear_tasks(&self, config: &Config) {
         let client = get_client(&config).expect("Error when creating http client");
