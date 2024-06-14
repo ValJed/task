@@ -83,7 +83,20 @@ impl Service for ApiService {
         }
     }
 
-    fn del_context(&self, config: &Config, name: String) {}
+    fn del_context(&self, config: &Config, index: String) {
+        let client = get_client(&config).expect("Error when creating http client");
+
+        let res: Response = client
+            .delete(get_url(&config, &format!("context/{}?index=true", index)))
+            .send()
+            .expect("Error when fetching contexts");
+
+        if res.status().is_success() {
+            println!("Context deleted");
+        } else {
+            println!("Error when deleting context, status: {}", res.status());
+        }
+    }
 
     fn del_task(&self, config: &Config, id: String) {
         let client = get_client(&config).expect("Error when creating http client");
