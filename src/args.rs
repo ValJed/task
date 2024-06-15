@@ -37,7 +37,7 @@ pub enum Commands {
     Rmc(TaskArgs),
     /// Clear all tasks for the active context
     Clear,
-    /// Migrate your data from file to API or the opposite
+    /// Migrate your data from file to rest API
     Migrate,
 }
 
