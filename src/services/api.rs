@@ -171,9 +171,9 @@ impl Service for ApiService {
             .expect("Error when fetching contexts");
 
         if res.status().is_success() {
-            println!("Task marked as done");
+            println!("Tasks marked as done");
         } else {
-            println!("Error when marking task as done, status: {}", res.status());
+            println!("Error when marking tasks as done, status: {}", res.status());
         }
     }
 
