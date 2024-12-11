@@ -101,14 +101,14 @@ impl Service for ApiService {
     fn del_task(&self, config: &Config, id: String) {
         let client = get_client(&config).expect("Error when creating http client");
 
-        let _data: Task = client
+        let _data: Vec<Task> = client
             .delete(get_url(&config, &format!("task/{}?index=true", id)))
             .send()
             .expect("Error when fetching contexts")
             .json()
             .expect("Error when parsing response");
 
-        println!("Task deleted");
+        println!("Tasks deleted");
     }
 
     fn list_tasks(&self, config: &Config, all: bool) {
